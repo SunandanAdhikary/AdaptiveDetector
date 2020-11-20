@@ -1,14 +1,15 @@
 % a for attacker, d for detector, c for controller
-system="esp"
-whichAgents="d";
+system = "esp"
+whichAgents = "d";
 whichAg_sim=1; % same: updated accordingly for simulink
-model= "rlVarTh_func_withController"; % can run with "ad"
+model = "rlVarTh_func_withController"; % can run with "ad"
 %reset: in case models are not trained right, make fresh models chucking the current object
 doReset = false; 
 doTraining = true;
 if ~doTraining
-    PRE_TRAINED_MODEL_DIR="";%take trained matfile from folder from saved_agent dir if not training
+    PRE_TRAINED_MODEL_DIR = "";%take trained matfile from folder from saved_agent dir if not training
 end
+ifSim = true; % if you want to simulate after training
 format long g;
 %% Sampling Period, Episode duration
 Tf = 15;
@@ -345,4 +346,5 @@ end
 if ifSim
     simOpts = rlSimulationOptions('MaxSteps',maxsteps,'StopOnError','on');
     experiences = sim(env,agentObjs,simOpts);
+    save(savedir + "/trainedSimulation.mat",'experiences');
 end
