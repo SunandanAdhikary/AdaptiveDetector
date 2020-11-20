@@ -1,8 +1,14 @@
 % a for attacker, d for detector, c for controller
+system="esp"
 whichAgents="d";
 whichAg_sim=1; % same: updated accordingly for simulink
-% model= "rlVarTh_func_withController";
 model= "rlVarTh_func_withController"; % can run with "ad"
+%reset: in case models are not trained right, make fresh models chucking the current object
+doReset = false; 
+doTraining = true;
+if ~doTraining
+    PRE_TRAINED_MODEL_DIR="";%take trained matfile from folder from saved_agent dir if not training
+end
 format long g;
 %% Sampling Period, Episode duration
 Tf = 15;
@@ -12,38 +18,41 @@ maxepisodes  = 10000;
 % agents= model+["/RL Attacker Agent","/RL Controller Agent"]%...
 %                                             "/RL Detector Agent"];
 
-%% esp
-s.Ts=0.04;
-s.A = [0.4450 -0.0458;1.2939 0.4402];
-s.B = [0.0550;4.5607];
-s.C = [0 1];
-s.D = 0;
-% K=[-0.0987 0.1420];
-s.K = [0.2826    0.0960];
-s.L= [-0.0390;0.4339];
-s.safex = [1,2];
-s.init = 0.1;
-s.perf = 0.1;
-s.th = 4.35; 
-s.settlingTime = 5 
-s.sensorRange = [2.5] 
-s.actuatorRange = [0.8125] 
+if system== "esp"
+    %% esp
+    s.Ts=0.04;
+    s.A = [0.4450 -0.0458;1.2939 0.4402];
+    s.B = [0.0550;4.5607];
+    s.C = [0 1];
+    s.D = 0;
+    % K=[-0.0987 0.1420];
+    s.K = [0.2826    0.0960];
+    s.L= [-0.0390;0.4339];
+    s.safex = [1,2];
+    s.init = 0.1;
+    s.perf = 0.1;
+    s.th = 4.35; 
+    s.settlingTime = 5 
+    s.sensorRange = [2.5] 
+    s.actuatorRange = [0.8125] 
+end
+if system=="trajectory"
 %% trajectory tracking
-% s.Ts = 0.1;
-% s.A = [1.0000    0.1000; 0    1.0000];
-% s.B = [0.0050; 0.1000];
-% s.C = [1 0];
-% s.D = [0];
-% s.K = [16.0302    5.6622];  % settling time around 10
-% s.L = [0.9902; 0.9892];
-% s.safex = [25,30];
-% s.init = 0.1;
-% s.perf = 0.3
-% s.th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
-% s.sensorRange = [30000];
-% s.actuatorRange = [36];
-% s.settlingTime = 13; 
-
+    s.Ts = 0.1;
+    s.A = [1.0000    0.1000; 0    1.0000];
+    s.B = [0.0050; 0.1000];
+    s.C = [1 0];
+    s.D = [0];
+    s.K = [16.0302    5.6622];  % settling time around 10
+    s.L = [0.9902; 0.9892];
+    s.safex = [25,30];
+    s.init = 0.1;
+    s.perf = 0.3
+    s.th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
+    s.sensorRange = [30000];
+    s.actuatorRange = [36];
+    s.settlingTime = 13; 
+end
 %% init
 % s.z=[0,0];
 xdim= size(s.A,2);
@@ -242,9 +251,22 @@ agentAttacker= "/RL Attacker Agent";
 agentController= "/RL Controller Agent";
 agentDetector= "/RL Detector Agent";
 
-agentAtk = rlDDPGAgent(actorAtk,criticAtk,agentOpts);
-agentCon = rlDDPGAgent(actorCon,criticCon,agentOpts);
-agentDtc = rlDDPGAgent(actorDtc,criticDtc,agentOpts);
+if doReset
+    agentAtk = rlDDPGAgent(actorAtk,criticAtk,agentOpts);
+     agentCon = rlDDPGAgent(actorCon,criticCon,agentOpts);
+      agentDtc = rlDDPGAgent(actorDtc,criticDtc,agentOpts);
+end
+
+if ~exist('agentAtk','var')
+    agentAtk = rlDDPGAgent(actorAtk,criticAtk,agentOpts);
+end
+if ~exist('agentCon','var')
+    agentCon = rlDDPGAgent(actorCon,criticCon,agentOpts);
+end
+if ~exist('agentDtc','var')
+    agentDtc = rlDDPGAgent(actorDtc,criticDtc,agentOpts);
+end
+    
 % a for attcker agent = 2
 if whichAgents.contains("a")
     agents= [agents model+agentAttacker];
@@ -292,7 +314,7 @@ trainOpts = rlTrainingOptions(...
     'SaveAgentValue',3000)%,...
 %     'SaveExperienceBufferWithAgent',false);
 
-doTraining = true;
+
 USE_PRE_TRAINED_MODEL = ~doTraining; % Set to true, to use pre-trained
 if doTraining
     agentOpts.ResetExperienceBufferBeforeTraining = false;
@@ -319,7 +341,8 @@ else
         'agentCon');
     agentObjs = [atk_agent dtc_agent ctrl_agent];
 end
-% Train the agent.
-
-% simOpts = rlSimulationOptions('MaxSteps',maxsteps,'StopOnError','on');
-% experiences = sim(env,agentObjs,simOpts);
+% Simulate the agent.
+if ifSim
+    simOpts = rlSimulationOptions('MaxSteps',maxsteps,'StopOnError','on');
+    experiences = sim(env,agentObjs,simOpts);
+end
