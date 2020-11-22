@@ -105,8 +105,9 @@ numObservationsCon = obsInfo{1,2}.Dimension(1);
 numObservationsDtc = obsInfo{1,3}.Dimension(1);
 % obsInfo{1,1}.Datatype , obsInfo{1,2}.Datatype, obsInfo{1,3}.Datatype= long g;
 %% Multi Agent Action Properties
-actInfo = {rlNumericSpec([2 1]),rlNumericSpec([1 1]),...
-                rlNumericSpec([2 1])};
+actInfo = {rlNumericSpec([2 1],'LowerLimit', -s.sensorRange,'UpperLimit',s.sensorRange),...
+    rlNumericSpec([1 1],'LowerLimit', -s.actuatorRange,'UpperLimit',s.actuatorRange),...
+                rlNumericSpec([2 1],'LowerLimit', 0,'UpperLimit',inf)};
 actInfo{1,1}.Name = 'actuator attack';
 actInfo{1,2}.Name = 'control input';
 actInfo{1,3}.Name = 'Detection threshold';
