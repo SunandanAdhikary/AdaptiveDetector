@@ -1,9 +1,9 @@
 %% Your simulink model file name
 clear all;
-model= "rlVarTh_func";
-agent1= "rlVarTh_func/RL Attacker Agent";
-agent2= "rlVarTh_func/RL Controller Agent";
-agent3= "rlVarTh_func/RL Detector Agent";
+model= "rlVarTh_siml";
+agent1= "rlVarTh_siml/RL Attacker Agent";
+agent2= "rlVarTh_siml/RL Controller Agent";
+agent3= "rlVarTh_siml/RL Detector Agent";
 % esp_env = RLenv;
 
 %% Sampling Period, Episode duration
@@ -20,46 +20,48 @@ Ts = 0.1;
 % % K=[-0.0987 0.1420];
 % % L= [-0.0390;0.4339];
 % % safex = [1,2];
-% % tolerance = [0.1,0.1];
+% % tolerance = [0.1,0.1]; 
 % % th = 0.8;
 % % sensorRange = [2.5];
 % % actuatorRange = [0];
 % 
 % %% trajectory tracking
-s.Ts = 0.1;
-s.A = [1.0000    0.1000; 0    1.0000];
-s.B = [0.0050; 0.1000];
-s.C = [1 0];
-s.D = [0];
-s.K = [16.0302    5.6622];  % settling time around 10
-s.L = [0.9902; 0.9892];
-s.safex = [25,30];
-s.tolerance = [1,1];
-s.th = 2.15;              % new: changed it a bit so that without attack, the residue remains below threshold.
-s.sensorRange = [30000];
-s.actuatorRange = [36];
+Ts = 0.1;
+A = [1.0000    0.1000; 0    1.0000];
+B = [0.0050; 0.1000];
+C = [1 0];
+D = [0];
+K = [16.0302    5.6622];  % settling time around 10
+L = [0.9902; 0.9892];
+safex = [25,30];
+tolerance = [1,1];
+th = 2.15;              % new: changed it a bit so that without attack, the residue remains below threshold.
+sensorRange = [30000];
+actuatorRange = [36];
 
 %% init
-s.z=[0,0];
-s.t(1)=0*Ts;            
-s.x_act(:,1) =[2*s.safex(1,1)*randn(1)-s.safex(1,1);...
-                    2*s.safex(1,2)*randn(1)-s.safex(1,2)];
-% s. xatk(1)= s.x_act(1);
-s.xhat(:,1)=[0;0];
-s.est_err(:,1)= s.x_act(:,1)-s.xhat(:,1);
-s.u_act(:,1)= s.K*s.xhat(:,1);
-s.a_u(:,1)= zeros(size(s.u_act(:,1)));
-s.uatk(:,1)= s.u_act(:,1)+s.a_u(:,1);
-s.y_act(:,1)= s.C*s.x_act(:,1);
-s.a_y(:,1)= zeros(size(s.y_act(:,1)));
-s.yatk(:,1)= s.y_act(:,1)+s.a_y(:,1);
-s.z(:,1)= s.yatk(:,1)-s.C*s.xhat(:,1);
-s.z_mean(:,1)= zeros(size(s.z));
-s.P= cov(s.z');
-s.g(1)= 0;
-s.chi_tst(1)= 0;
-s.threshold(1)= s.th;
-s.tau(1)= 1;
+% z=[0,0];
+ulim= actuatorRange;
+ylim= sensorRange;
+t(1)=0*Ts;            
+x_act(:,1) =[2*safex(1,1)*randn(1)-safex(1,1);...
+                    2*safex(1,2)*randn(1)-safex(1,2)];
+%  xatk(1)= x_act(1);
+xhat(:,1)=[0;0];
+est_err(:,1)= x_act(:,1)-xhat(:,1);
+u_act(:,1)= max(-ulim,min(ulim,K*xhat(:,1)));
+a_u(:,1)= zeros(size(u_act(:,1)));
+uatk(:,1)= max(-ulim,min(ulim,u_act(:,1)+a_u(:,1)));
+y_act(:,1)= max(-ylim,min(ylim,C*x_act(:,1)));
+a_y(:,1)= zeros(size(y_act(:,1)));
+yatk(:,1)= max(-ylim,min(ylim,y_act(:,1)+a_y(:,1)));
+z(:,1)= yatk(:,1)-C*xhat(:,1);
+z_mean(:,1)= z(:,1);
+P= cov(z');
+g(1)= 0;
+chi_tst(1)= 0;
+threshold(1)= th;
+tau(1)= 1;
 
 %% Multi Agent Observation Properties
 obsInfo = {[rlNumericSpec([5 1])], [rlNumericSpec([4 1])], [rlNumericSpec([4 1])]};%,...3 observeations in continuous domain: residue,output,actuation
@@ -187,15 +189,15 @@ agentOpts = rlDDPGAgentOptions(...
     'DiscountFactor',1.0, ...
     'MiniBatchSize',64, ...
     'ExperienceBufferLength',1e6); 
-agentOpts.NoiseOptions.Variance = 0.3;
-agentOpts.NoiseOptions.VarianceDecayRate = 1e-5;
+agentOptNoiseOptionVariance = 0.3;
+agentOptNoiseOptionVarianceDecayRate = 1e-5;
 % agentObj = rlDDPGAgent(actor,critic,agentOpts);
 
 %% environment creation
 env = rlSimulinkEnv(model,[agent1, agent2, agent3]);
 % obsInfo=getObservationInfo(env); actInfo=getActorInfo(env); %% How to
-% reset the environment in every iteration/episode
-% @(in)localResetFcn(in); env.ResetFcn = @(in)
+%% reset the environment in every iteration/episode
+% @(in)localResetFcn(in); env.ResetFcn = @(in);
 % env.ResetFcn = setVariable(in,'theta0',randn,'Workspace',mdl);
 
 %% Training

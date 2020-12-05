@@ -1,0 +1,5 @@
+*.asv
+*.slxc
+*.autosave
+savedAgents/
+slprj/

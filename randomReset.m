@@ -1,12 +1,14 @@
-function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K, th)
+function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K, th, delta)
     disp("resetting");
     % Randomization Parameters
     % Note: Y-direction parameters are only used for the 3D walker model
     rng shuffle;
-    proc_noise= 1.2*rand(xdim,simlen);
+    %% noise
+    proc_noise= 1*rand(xdim,simlen);
     in = in.setVariable('s.proc_noise', proc_noise);
-    meas_noise= 0.02*rand(ydim,simlen);
+    meas_noise= 0.01*rand(ydim,simlen);
     in = in.setVariable('s.meas_noise', meas_noise);
+    %% init
     x =zeros(xdim,simlen);
     init_x =[2*init*safex(1,1)*rand(1)-init*safex(1,1);...
                     2*init*safex(1,2)*rand(1)-init*safex(1,2)]
@@ -31,7 +33,7 @@ function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K,
     in = in.setVariable('s.yatk', yatk);
     z = yatk-C*xhat;
     in = in.setVariable('s.z', z);
-    in = in.setVariable('s.z_mean', z);
+    in = in.setVariable('s.z_mean', zeros(size(z,1),simlen));
     in = in.setVariable('s.z_var',zeros(size(z,1),simlen));
     g = zeros(1,simlen);
     in = in.setVariable('s.g', g);
@@ -43,4 +45,8 @@ function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K,
     in = in.setVariable('s.tau', tau);
     non_cent= zeros(1,simlen);
     in = in.setVariable('s.non_cent', non_cent);
+    avgfar= chi2cdf(th,1*size(C,1),'upper');
+    in = in.setVariable('s.avgfar', avgfar.*ones(1,simlen));
+    avgtpr = ncx2cdf(th,1*size(C,1),non_cent,'upper');
+    in = in.setVariable('s.avgtpr', avgtpr.*ones(1,simlen));
 end
