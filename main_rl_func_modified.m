@@ -1,10 +1,10 @@
 % a for attacker, d for detector, c for controller
-system = "trajectory"
+system = "esp_journal"
 whichAgents = "adc";
 whichAg_sim=1; % same: updated accordingly for simulink
 model = "rlVarTh_func_withController"; % can run with "adc"
 %reset: in case models are not trained right, make fresh models chucking the current object
-doReset = false; 
+doReset = true; 
 doTraining = true;
 ifSim = true; % if you want to simulate after training
 
@@ -14,10 +14,10 @@ end
 
 % format long g;
 %% Sampling Period, Episode duration
-Tf = 1;
+Tf = 10;
 Ts = 0.1;
 simlen=ceil(Tf/Ts);
-maxepisodes  = 10;
+maxepisodes  = 20000;
 % agents= model+["/RL Attacker Agent","/RL Controller Agent"]%...
 %                                             "/RL Detector Agent"];
 
@@ -36,13 +36,14 @@ if system== "esp"
     s.perf = 0.1;
     s.th = 11.5; 
     s.settlingTime = 5 ;
-    s.sensorRange = [2.5] ;
-    s.actuatorRange = [0.8125]; 
+    s.sensorRange = [2.5] ;     % columnwise range of each y
+    s.actuatorRange = [0.8125]; % columnwise range of each u
     s.noisy_zvar=0.1;
     s.noisy_zmean= 0.5;
 end
 
 if system=="esp_journal"
+    s.Ts=0.04;
     s.A = [0.6278   -0.0259;
         0.4644    0.7071];
 
@@ -66,8 +67,8 @@ if system=="esp_journal"
     s.perf = 0.2;
     s.th = 4.35; 
     s.settlingTime = 13 ;
-    s.sensorRange = [2.5]; 
-    s.actuatorRange = [15];
+    s.sensorRange = [2.5;2.5];  % columnwise range of each y
+    s.actuatorRange = [15;15]; % columnwise range of each u
     s.noisy_zvar=0.1;
     s.noisy_zmean= 0.5;
 end
@@ -85,30 +86,29 @@ if system=="trajectory"
     s.init = 0.1;
     s.perf = 0.3
     s.th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
-    s.sensorRange = [30000];
-    s.actuatorRange = [36];
+    s.sensorRange = [30000];  % columnwise range of each y
+    s.actuatorRange = [36];   % columnwise range of each u
     s.settlingTime = 13; 
     s.noisy_zvar=0.1;
     s.noisy_zmean= 0.5;
 end
-%% init
+%% dimensions
 % s.z=[0,0];
 xdim= size(s.A,2);
 ydim= size(s.C,1);
 udim= size(s.B,2);
-
+%% ranges
 ulim= s.actuatorRange;
 ylim= s.sensorRange;
+%% random noise vars
 rng shuffle;
 s.proc_noise= 1*rand(xdim,simlen);
 s.meas_noise= 0.01*rand(ydim,simlen);
-
-
+%% init system vars
 s.t = Ts*zeros(simlen);  
 s.x_act =zeros(xdim,simlen);
 
-s.x_act(:,1) =[2*s.init*s.safex(1,1)*rand(1)-s.safex(1,1)*s.init;...
-                    2*s.init*s.safex(1,2)*rand(1)-s.safex(1,2)*s.init]
+s.x_act(:,1) =(2*s.init*s.safex*rand(xdim)-s.safex*s.init)';
 % s. xatk(1)= s.x_act(1);
 s.xhat = zeros(xdim,simlen);
 % s.est_err(:,simlen)= zeros(size(xdim,simlen));
@@ -130,27 +130,39 @@ s.tau= ones(1,simlen);
 s.non_cent= zeros(size(s.z,1),simlen);
 s.avgfar= chi2cdf(s.th,1*size(s.C,1),'upper')*ones(1,simlen);
 s.avgtpr = ncx2cdf(s.th,1*size(s.C,1),s.non_cent(1),'upper')*ones(1,simlen);
-
+%% Agent Observation / Action Dimensions
+atkActDim= udim+ydim;%[a;ay]
+dtcActDim= 2; %[th;l]
+conActDim= udim; % [u_new]
+atkObsDim= 1+ydim+udim+1+size(s.C*s.safex',1)+atkActDim+dtcActDim;%[ref;y-ay;u-au;g;safey;prevAct;prevActDtc]
+dtcObsDim= ydim+dtcActDim+1+1;%[y;prevAct;g;delta]
+conObsDim= udim+conActDim+ydim+1+size(s.C*s.safex',1);%[ulim;prevAct;y;ref;safey]
 %% Multi Agent Observation Properties
-obsInfo = {[rlNumericSpec([9 1])], [rlNumericSpec([5 1])],...
-            [rlNumericSpec([5 1])]};% 3 observeations in continuous domain: residue,output,actuation
+% 1-- attacker, 2-- Controller, 3-- Detector
+obsInfo = {[rlNumericSpec([atkObsDim 1])], [rlNumericSpec([conObsDim 1])],...
+            [rlNumericSpec([dtcObsDim 1])]};% 3 observeations in continuous domain: residue,output,actuation
 %     'LowerLimit',[-inf -inf 0  ]',...
 %     'UpperLimit',[ inf  inf inf]');
 obsInfo{1,1}.Name , obsInfo{1,2}.Name, obsInfo{1,3}.Name = 'observations';
 % obsInfo{1,1}.Name , obsInfo{1,2}.Name ='observations';
 obsInfo{1,1}.Description , obsInfo{1,2}.Description,...
     obsInfo{1,2}.Description = 'residue,output and control input';
+
 numObservationsAtk = obsInfo{1,1}.Dimension(1);
 numObservationsCon = obsInfo{1,2}.Dimension(1);
 numObservationsDtc = obsInfo{1,3}.Dimension(1);
 % obsInfo{1,1}.Datatype , obsInfo{1,2}.Datatype, obsInfo{1,3}.Datatype= long g;
 %% Multi Agent Action Properties
-actInfo = {rlNumericSpec([2 1],'LowerLimit', -s.sensorRange,'UpperLimit',s.sensorRange),...
-    rlNumericSpec([1 1],'LowerLimit', -s.actuatorRange,'UpperLimit',s.actuatorRange),...
-                rlNumericSpec([2 1],'LowerLimit', 1,'UpperLimit',inf)};
-actInfo{1,1}.Name = 'actuator attack';
+% 1-- attacker, 2-- Controller, 3-- Detector
+actInfo = {rlNumericSpec([atkActDim 1],...
+            'LowerLimit', -[ulim;ylim],'UpperLimit',[ulim;ylim]),...
+           rlNumericSpec([conActDim 1],...
+            'LowerLimit', -ulim,'UpperLimit',ulim),...
+           rlNumericSpec([dtcActDim 1],...
+            'LowerLimit',[0;1],'UpperLimit',[inf;simlen])};
+actInfo{1,1}.Name = 'actuator n sensor attack';
 actInfo{1,2}.Name = 'control input';
-actInfo{1,3}.Name = 'Detection threshold';
+actInfo{1,3}.Name = 'threshold n window';
 numActionsAtk = actInfo{1,1}.Dimension(1);
 numActionsCon = actInfo{1,2}.Dimension(1);
 numActionsDtc = actInfo{1,3}.Dimension(1);
@@ -240,7 +252,7 @@ actorNetwork = [
     reluLayer('Name','actorRelu2')
     fullyConnectedLayer(numActionsAtk,'Name','actorFC3')
     tanhLayer('Name','actorTanhAtk')
-    scalingLayer('Name','actorScalingAtk','Scale',s.sensorRange,'Bias',0)];
+    scalingLayer('Name','actorScalingAtk','Scale',[ulim;ylim])];
 actorOptions = rlRepresentationOptions('LearnRate',1e-04,'GradientThreshold',1);
 actorAtk = rlDeterministicActorRepresentation(actorNetwork,obsInfo{1,1},...
     actInfo{1,1},'Observation',{'StateAtk'},'Action',{'actorScalingAtk'},...
@@ -255,7 +267,7 @@ actorNetwork = [
     reluLayer('Name','actorRelu2')
     fullyConnectedLayer(numActionsCon,'Name','actorFC3')
     tanhLayer('Name','actorTanhCon')
-    scalingLayer('Name','actorScalingCon','Scale',s.actuatorRange,'Bias',0)];
+    scalingLayer('Name','actorScalingCon','Scale',ulim)];
 actorOptions = rlRepresentationOptions('LearnRate',1e-04,'GradientThreshold',1);
 actorCon = rlDeterministicActorRepresentation(actorNetwork,obsInfo{1,2},...
     actInfo{1,2},'Observation',{'StateCon'},'Action',{'actorScalingCon'},...
@@ -338,12 +350,12 @@ if whichAgents.contains("d")
 end
 % agents = agent1;
 % open_system(model);
-env = rlSimulinkEnv(model,agents)%,observations,actions);
+env = rlSimulinkEnv(model,agents,observations,actions);
 % obsInfo=getObservationInfo(env); actInfo=getActorInfo(env); %% How to
 %% reset the environment in every iteration/episode
 % @(in)localResetFcn(in); env.ResetFcn = @(in);
 env.ResetFcn = @(in) randomReset(in, s.init, s.safex, simlen, xdim, ydim, ...
-                                            ylim, ulim, s.C, s.K, s.th,s.non_cent(1));
+                                   ylim, ulim, s.C, s.K, s.th,s.non_cent(1));
 
 %% Training
 maxsteps = simlen;
@@ -363,11 +375,15 @@ trainOpts = rlTrainingOptions(...
 USE_PRE_TRAINED_MODEL = ~doTraining; % Set to true, to use pre-trained
 if doTraining
     agentOpts.ResetExperienceBufferBeforeTraining = false;
+    
+    % make directory
+    dt=strrep(datestr(datetime),':','-');dt=strrep(dt,' ','_');
+    dtf=dt+"_"+system+"_"+whichAgents;
+    mkdir(trainOpts.SaveAgentDirectory,dtf);
+    savedir= trainOpts.SaveAgentDirectory+'/'+dtf;
+
     % run with new agents
     trainingStats = train(agentObjs,env,trainOpts);  
-    dt=strrep(datestr(datetime),':','_');
-    mkdir(trainOpts.SaveAgentDirectory,dt);
-    savedir= trainOpts.SaveAgentDirectory+'/'+dt;
     save(savedir + "/AttckerAgentFin.mat",'agentAtk');
     save(savedir + "/ControllerAgentFin.mat",'agentCon');
     save(savedir + "/DetectorAgentFin.mat",'agentDtc');

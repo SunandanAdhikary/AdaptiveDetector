@@ -1,5 +1,5 @@
 function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K, th, delta)
-    disp("resetting");
+%     disp("resetting");
     % Randomization Parameters
     % Note: Y-direction parameters are only used for the 3D walker model
     rng shuffle;
@@ -10,8 +10,7 @@ function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K,
     in = in.setVariable('s.meas_noise', meas_noise);
     %% init
     x =zeros(xdim,simlen);
-    init_x =[2*init*safex(1,1)*rand(1)-init*safex(1,1);...
-                    2*init*safex(1,2)*rand(1)-init*safex(1,2)]
+    init_x =(2*init*safex*rand(xdim)-safex*init)'
 %      x = [2*s.safex'*randn(1,xdim)-s.safex' zeros(xdim,simlen-1)] 
     x(:,1) = init_x ;
     in = in.setVariable('s.x_act', x);
@@ -49,4 +48,5 @@ function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K,
     in = in.setVariable('s.avgfar', avgfar.*ones(1,simlen));
     avgtpr = ncx2cdf(th,1*size(C,1),non_cent,'upper');
     in = in.setVariable('s.avgtpr', avgtpr.*ones(1,simlen));
+    disp("reset");
 end
