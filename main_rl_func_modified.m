@@ -1,5 +1,5 @@
 % a for attacker, d for detector, c for controller
-system = "esp_journal"
+system = "esp"
 whichAgents = "adc";
 whichAg_sim=1; % same: updated accordingly for simulink
 model = "rlVarTh_func_withController"; % can run with "adc"
@@ -13,14 +13,7 @@ if ~doTraining
 end
 
 % format long g;
-%% Sampling Period, Episode duration
-Tf = 10;
-Ts = 0.1;
-simlen=ceil(Tf/Ts);
-maxepisodes  = 20000;
-% agents= model+["/RL Attacker Agent","/RL Controller Agent"]%...
-%                                             "/RL Detector Agent"];
-
+%% systems
 if system== "esp"
     %% esp
     s.Ts=0.04;
@@ -92,6 +85,18 @@ if system=="trajectory"
     s.noisy_zvar=0.1;
     s.noisy_zmean= 0.5;
 end
+
+%% Sampling Period, Episode duration
+
+simlen=100;
+Ts = s.Ts;
+Tf = simlen*Ts;
+% simlen=ceil(Tf/Ts);
+maxepisodes  = 20000;
+% agents= model+["/RL Attacker Agent","/RL Controller Agent"]%...
+%                                             "/RL Detector Agent"];
+
+
 %% dimensions
 % s.z=[0,0];
 xdim= size(s.A,2);
