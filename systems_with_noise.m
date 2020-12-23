@@ -3,6 +3,35 @@
 clear;
 clc;
 clf;
+%% esp_bicycle
+Ts=0.04;
+A = [0.6278   -0.0259;
+    0.4644    0.7071];
+
+B = [0.1246   -0.00000028;
+    3.2763    0.000016];
+
+C = [0    1.0000
+ -338.7813    1.1293];
+
+D = [0         0;
+  169.3907         0];
+
+K = [5.261 -0.023;
+    -414911.26, 57009.48];
+
+L = [-0.00000000002708 -0.00000000063612;
+    0.00000000033671  0.00000000556308];
+
+safex = [1,2];
+ini = 1;
+perf = 0.2;
+% th = 4.35; 
+% settlingTime = 13 ;
+% sensorRange = [2.5;15];  % columnwise range of each y
+% actuatorRange = [0.8125;0.8125]; % columnwise range of each u
+% noisy_zvar=0.1;
+% noisy_zmean= 0.5;
 %% esp
 % Ts=0.04;
 % A = [0.4450 -0.0458;1.2939 0.4402];
@@ -26,25 +55,25 @@ clf;
 
 
 %% ttc
-    Ts = 0.1;
-    A = [1.0000    0.1000; 0    1.0000];
-    B = [0.0050; 0.1000];
-    C = [1 0];
-    D = [0];
-    K = [16.0302    5.6622];  % settling time around 10
-    L = [0.9902; 0.9892];
-ini=0.1;
-perf=0.3;
-safex=[25 30]
-
+%     Ts = 0.1;
+%     A = [1.0000    0.1000; 0    1.0000];
+%     B = [0.0050; 0.1000];
+%     C = [1 0];
+%     D = [0];
+%     K = [16.0302    5.6622];  % settling time around 10
+%     L = [0.9902; 0.9892];
+% ini=0.1;
+% perf=0.3;
+% safex=[25 30]
+xdim=size(A,1);
+udim=size(B,2);
 rng shuffle;
-x=[2*ini*safex(1)*rand(1)-ini*safex(1);...
-                    2*ini*safex(2)*rand(1)-ini*safex(2)]
+x=(2*ini*safex*rand(xdim)-safex*ini)';
 proc_var= 1; meas_var=0.01;
 % x = [0.0976827903;0.1724794346];
 y = C*x;
-z = [0;0];
-u = 0;
+z = zeros(xdim,1);
+u =zeros(udim,1);
 max_x1 = abs(x(1));
 max_x2 = abs(x(2));
 
@@ -67,8 +96,8 @@ for i=1:time
        max_x2 = abs(x(2));
    end  
    
-   res(i)=r;
-   ester(:,i)=(x-z);
+   res(i,:)=r;
+   ester(i,:)=(x-z);
    plot_dist(i) = x(1);
    plot_vel(i) = x(2);
    plot_dist_est(i) = z(1);
@@ -94,6 +123,6 @@ hold off;
 
 max_x1
 max_x2
-var(res')
+cov(res)
 mean(res)
-mean(res)^2/var(res')
+mean(res)*inv(cov(res))*mean(res)'

@@ -1,10 +1,10 @@
 % a for attacker, d for detector, c for controller
-system = "esp"
+system = "esp_journal"
 whichAgents = "adc";
 whichAg_sim=1; % same: updated accordingly for simulink
 model = "rlVarTh_func_withController"; % can run with "adc"
 %reset: in case models are not trained right, make fresh models chucking the current object
-doReset = true; 
+doReset = false; 
 doTraining = true;
 ifSim = true; % if you want to simulate after training
 
@@ -12,7 +12,6 @@ if ~doTraining
     PRE_TRAINED_MODEL_DIR = "";%take trained matfile from folder from saved_agent dir if not training
 end
 
-% format long g;
 %% systems
 if system== "esp"
     %% esp
@@ -25,14 +24,21 @@ if system== "esp"
     s.K = [0.2826    0.0960];
     s.L= [-0.0390;0.4339];
     s.safex = [1,2];
+    % from perfReg.py with this system
     s.init = 0.1;
+    % from perfReg.py with this system
     s.perf = 0.1;
-    s.th = 11.5; 
+    % for central chi2 FAR < 0.05
+    s.th = 4.5; 
     s.settlingTime = 5 ;
     s.sensorRange = [2.5] ;     % columnwise range of each y
     s.actuatorRange = [0.8125]; % columnwise range of each u
+    % from system_with_noise.m with this system
     s.noisy_zvar=0.1;
+    % from system_with_noise.m with this system
     s.noisy_zmean= 0.5;
+    s.uatkon=[1];   % attack on which u
+    s.yatkon=[1];   % attack on which y
 end
 
 if system=="esp_journal"
@@ -56,14 +62,21 @@ if system=="esp_journal"
         0.00000000033671  0.00000000556308];
     
     s.safex = [1,2];
+    % from perfReg.py with this system
     s.init = 0.1;
+    % from perfReg.py with this system
     s.perf = 0.2;
+    % for central chi2 FAR < 0.05
     s.th = 4.35; 
-    s.settlingTime = 13 ;
-    s.sensorRange = [2.5;2.5];  % columnwise range of each y
-    s.actuatorRange = [15;15]; % columnwise range of each u
-    s.noisy_zvar=0.1;
-    s.noisy_zmean= 0.5;
+    s.settlingTime = 12 ;
+    s.sensorRange = [2.5;15];  % columnwise range of each y
+    s.actuatorRange = [0.8125;10000]; % columnwise range of each u
+    % from system_with_noise.m with this system
+    s.noisy_zvar=[0 -20;-20 15507];   
+    % from system_with_noise.m with this system
+    s.noisy_zmean= [3.4563 -371.7262];
+    s.uatkon=[1;0];   % attack on which u
+    s.yatkon=[1;1];   % attack on which y
 end
 
 if system=="trajectory"
@@ -76,14 +89,21 @@ if system=="trajectory"
     s.K = [16.0302    5.6622];  % settling time around 10
     s.L = [0.9902; 0.9892];
     s.safex = [25,30];
+    % from perfReg.py with this system
     s.init = 0.1;
-    s.perf = 0.3
+    % from perfReg.py with this system
+    s.perf = 0.3;
+    % for central chi2 FAR < 0.05
     s.th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
-    s.sensorRange = [30000];  % columnwise range of each y
+    s.sensorRange = [30];  % columnwise range of each y
     s.actuatorRange = [36];   % columnwise range of each u
     s.settlingTime = 13; 
+    % from system_with_noise.m with this system
     s.noisy_zvar=0.1;
+    % from system_with_noise.m with this system
     s.noisy_zmean= 0.5;
+    s.uatkon=[1];   % attack on which u
+    s.yatkon=[1];   % attack on which y
 end
 
 %% Sampling Period, Episode duration
@@ -257,7 +277,7 @@ actorNetwork = [
     reluLayer('Name','actorRelu2')
     fullyConnectedLayer(numActionsAtk,'Name','actorFC3')
     tanhLayer('Name','actorTanhAtk')
-    scalingLayer('Name','actorScalingAtk','Scale',[ulim;ylim])];
+    scalingLayer('Name','actorScalingAtk','Scale',[ulim;ylim].*[s.uatkon;s.yatkon])];
 actorOptions = rlRepresentationOptions('LearnRate',1e-04,'GradientThreshold',1);
 actorAtk = rlDeterministicActorRepresentation(actorNetwork,obsInfo{1,1},...
     actInfo{1,1},'Observation',{'StateAtk'},'Action',{'actorScalingAtk'},...
@@ -302,7 +322,7 @@ agentOpts = rlDDPGAgentOptions(...
     'ExperienceBufferLength',1e6); 
 agentOpts.NoiseOptions.Variance = 0.3;
 agentOpts.NoiseOptions.VarianceDecayRate = 1e-5;
-agentOpts.SaveExperienceBufferWithAgent = 1;
+agentOpts.SaveExperienceBufferWithAgent = 0;
 %% environment creation
                                           
 agents= [];
