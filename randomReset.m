@@ -9,6 +9,8 @@ function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K,
     meas_noise= 0.01*rand(ydim,simlen);
     in = in.setVariable('s.meas_noise', meas_noise);
     %% init
+    t= 0.00;
+    in = in.setVariable('s.time', t);
     x =zeros(xdim,simlen);
     init_x =(2*init*safex*rand(xdim)-safex*init)'
 %      x = [2*s.safex'*randn(1,xdim)-s.safex' zeros(xdim,simlen-1)] 
@@ -49,4 +51,5 @@ function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K,
     avgtpr = ncx2cdf(th,1*size(C,1),non_cent,'upper');
     in = in.setVariable('s.avgtpr', avgtpr.*ones(1,simlen));
     disp("reset");
+%     evalin('base','save("system.mat","-struct","s")');
 end

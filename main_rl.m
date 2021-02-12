@@ -1,22 +1,30 @@
+clc;
 % log? then on
 % diary on;
+%% configuration params
+
 % choose among {trajectory, esp, esp_journal}
-system = "trajectory"
+system = "esp_journal"
+
 % agent activation: a= attacker, d= detector, c= controller
-whichAgents = "adc";
+whichAgents = "ac";
 whichAg_sim=1; % same as whichAgents: numeric for simulink
-model = "envModel_rl"; 
+
+model = "envModel_rl";
+
 % reset: in case models are not trained right, 
 % ..make fresh models chucking the current object
 doReset = true;    % if you want to dreshly create model,agents
 doTraining = true;  % if you want to newly train the agents
 doSimulation = true; % if you want to simulate after training
-loadPreTrained= true;  % if you want to reuse well trained agents
+loadPreTrained = false;  % if you want to reuse well trained agents
 if loadPreTrained
     % choose a backed up folder from savedAgents folder
-    PRE_TRAINED_MODEL_DIR = "savedAgents/29-Dec-2020_21-02-42_trajectory_adc";
+    PRE_TRAINED_MODEL_DIR = "savedAgents/lastWellTrained_esp_journal";
 end
-
+%% training/simulation length
+simlen=5;
+maxepisodes  = 1000;
 %% systems
 if system== "esp"
     %% esp
@@ -30,7 +38,7 @@ if system== "esp"
     s.L= [-0.0390;0.4339];
     s.safex = [1,2];
     % from perfReg.py with this system
-    s.init = 0.1;
+    s.init = 1;
     % from perfReg.py with this system
     s.perf = 0.1;
     % for central chi2 FAR < 0.05
@@ -47,6 +55,7 @@ if system== "esp"
 end
 
 if system=="esp_journal"
+%%     esp journal
     s.Ts=0.04;
     s.A = [0.6278   -0.0259;
         0.4644    0.7071];
@@ -68,7 +77,7 @@ if system=="esp_journal"
     
     s.safex = [1,2];
     % from perfReg.py with this system
-    s.init = 0.1;
+    s.init = 1;
     % from perfReg.py with this system
     s.perf = 0.2;
     % for central chi2 FAR < 0.05
@@ -77,7 +86,7 @@ if system=="esp_journal"
     s.sensorRange = [2.5;15];  % columnwise range of each y
     s.actuatorRange = [0.8125;10000]; % columnwise range of each u
     % from system_with_noise.m with this system
-    s.noisy_zvar=[0 -20;-20 15507];   
+    s.noisy_zvar=[10000 -20;-20 15507];   
     % from system_with_noise.m with this system
     s.noisy_zmean= [3.4563 -371.7262];
     s.uatkon=[1;0];   % attack on which u
@@ -95,7 +104,7 @@ if system=="trajectory"
     s.L = [0.9902; 0.9892];
     s.safex = [25,30];
     % from perfReg.py with this system
-    s.init = 0.1;
+    s.init = 1;
     % from perfReg.py with this system
     s.perf = 0.3;
     % for central chi2 FAR < 0.05
@@ -113,15 +122,13 @@ end
 
 %% Sampling Period, Episode duration
 
-simlen=100;
+% simlen=5;
 Ts = s.Ts;
 Tf = simlen*Ts;
 % simlen=ceil(Tf/Ts);
-maxepisodes  = 20000;
+% maxepisodes  = 5;
 % agents= model+["/RL Attacker Agent","/RL Controller Agent"]%...
 %                                             "/RL Detector Agent"];
-
-
 %% dimensions
 % s.z=[0,0];
 xdim= size(s.A,2);
@@ -135,9 +142,8 @@ rng shuffle;
 s.proc_noise= 1*rand(xdim,simlen);
 s.meas_noise= 0.01*rand(ydim,simlen);
 %% init system vars
-s.t = Ts*zeros(simlen);  
+s.time = 0.00;  
 s.x_act =zeros(xdim,simlen);
-
 s.x_act(:,1) =(2*s.init*s.safex*rand(xdim)-s.safex*s.init)';
 % s. xatk(1)= s.x_act(1);
 s.xhat = zeros(xdim,simlen);
@@ -151,7 +157,7 @@ s.y_act = max(-ylim,min(ylim,s.C*s.x_act+s.meas_noise));
 s.a_y = zeros(size(s.y_act));
 s.yatk = max(-ylim,min(ylim,s.y_act+s.a_y));
 s.z = s.yatk-s.C*s.xhat;
-s.z_mean= zeros(size(s.z,1),simlen) ;
+s.z_mean= ones(size(s.z,1),simlen) ;
 s.z_var =ones(size(s.z,1),simlen);
 s.g = zeros(1,simlen);
 s.chi_tst= zeros(1,simlen);
@@ -160,6 +166,7 @@ s.tau= ones(1,simlen);
 s.non_cent= zeros(size(s.z,1),simlen);
 s.avgfar= chi2cdf(s.th,1*size(s.C,1),'upper')*ones(1,simlen);
 s.avgtpr = ncx2cdf(s.th,1*size(s.C,1),s.non_cent(1),'upper')*ones(1,simlen);
+% save("system.mat",'-struct','s');
 %% Agent Observation / Action Dimensions
 atkActDim= udim+ydim;%[a;ay]
 dtcActDim= 2; %[th;l]
@@ -397,11 +404,15 @@ if whichAgents.contains("d")
     agentObjs= [agentObjs agentDtc];
     whichAg_sim= whichAg_sim*5;
 end
+% save("system.mat",'s');
+% save("test.mat",'Simulink.Bus.createObject(s)');
+Simulink.Bus.createObject(s);
+% s= evalin('base','s');
 % agents = agent1;
 % open_system(model);
 env = rlSimulinkEnv(model,agents,observations,actions);
 % obsInfo=getObservationInfo(env); actInfo=getActorInfo(env); %% How to
-%% reset the environment in every iteration/episode
+%% reset the environment in every episode
 % @(in)localResetFcn(in); env.ResetFcn = @(in);
 env.ResetFcn = @(in) randomReset(in, s.init, s.safex, simlen, xdim, ydim, ...
                                    ylim, ulim, s.C, s.K, s.th,s.non_cent(1));
