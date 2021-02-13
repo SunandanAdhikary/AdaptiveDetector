@@ -1,4 +1,5 @@
 clc;
+clear slBus1;
 % log? then on
 % diary on;
 %% configuration params
@@ -163,7 +164,7 @@ s.g = zeros(1,simlen);
 s.chi_tst= zeros(1,simlen);
 s.threshold= s.th*ones(1,simlen);
 s.tau= ones(1,simlen);
-s.non_cent= zeros(size(s.z,1),simlen);
+s.non_cent= zeros(1,simlen);
 s.avgfar= chi2cdf(s.th,1*size(s.C,1),'upper')*ones(1,simlen);
 s.avgtpr = ncx2cdf(s.th,1*size(s.C,1),s.non_cent(1),'upper')*ones(1,simlen);
 % save("system.mat",'-struct','s');
