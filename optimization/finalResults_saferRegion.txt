@@ -1,0 +1,141 @@
+
+Forcing center of x and xhat same and computing scale considering both x and xhat
+ESP:
+safer_reg =
+
+    0.4515    1.0000
+    1.4515    2.0000
+    0.4515    1.0000
+    1.4515    2.0000
+
+center
+	0.7258
+    1.7258
+    0.7258
+    1.7258
+	
+scale
+    0.2742
+	
+TTC (With actuator limit = 36)
+safer_reg =
+
+   17.2300   23.8816
+  -13.3443   -6.6928
+   17.2300   23.8816
+  -13.3443   -6.6928
+  
+center
+   20.5558
+  -10.0186
+   20.5558
+  -10.0186
+  
+scale
+    3.3258
+	
+============================================================================
+keeping center of x and xhat same, however, we allow the scales to vary
+TTC (With atuator limit as 36)
+safer region
+
+safer_reg =
+
+  -13.8753   13.8753
+  -13.8753   13.8753
+
+safer xhat
+
+safer_xhat_reg =
+
+  -14.1029   14.1029
+  -14.1029   14.1029
+
+scale of x
+
+ans =
+
+   13.8753
+
+scale of xhat
+
+ans =
+
+   14.1029
+
+center
+
+ans =
+
+     0
+     0
+	 
+	 
+TTC (With atuator limit as 50)
+safer region
+
+safer_reg =
+
+  -19.2712   19.2712
+  -19.2712   19.2712
+
+safer xhat
+
+safer_xhat_reg =
+
+  -19.5873   19.5873
+  -19.5873   19.5873
+
+scale of x
+
+ans =
+
+   19.2712
+
+scale of xhat
+
+ans =
+
+   19.5873
+
+center
+
+ans =
+
+     0
+     0
+	 
+ESP
+	 
+safer region
+
+safer_reg =
+
+   -1.0000    1.0000
+   -1.6423    0.3577
+
+safer xhat
+
+safer_xhat_reg =
+
+   -1.0000    1.0000
+   -1.6423    0.3577
+
+scale of x
+
+ans =
+
+     1
+
+scale of xhat
+
+ans =
+
+     1
+
+center
+
+ans =
+
+         0
+   -0.6423
