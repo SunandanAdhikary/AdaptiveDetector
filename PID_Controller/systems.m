@@ -56,6 +56,7 @@ x = [x_0 ; S_0];
 u1 = u_0;
 
 plot_x = zeros(1,t);
+plot_y = zeros(1,t);
 plot_ref = zeros(1,t);
 
 for i=1:t
@@ -69,11 +70,12 @@ for i=1:t
    y = C*x + D*u;
    
    if i>=attack_beg && i<=attack_end
-       y = y + attack;
+       y(1) = y(1) + attack;
    end
    
    u1 = -K*y;
    plot_x(i) = x(1);
+   plot_y(i) = y(1);
    plot_s(i) = S;
 end
 
@@ -86,6 +88,7 @@ plot(upper_safety*ones(1,t),'r:','LineWidth',linewidth);
 plot(lower_safety*ones(1,t),'r:','LineWidth',linewidth);
 plot(plot_s,'LineWidth',linewidth);
 plot(plot_x,'LineWidth',linewidth);
+plot(plot_y,'LineWidth',linewidth);
 axis([1 t lower_safety-1 upper_safety+1]);
-legend({'target upper bound','target lower bound','safety upper bound','safety lower bound','reference', 'state'});
+legend({'target upper bound','target lower bound','safety upper bound','safety lower bound','reference', 'state','measurement'});
 grid off;
