@@ -1,6 +1,7 @@
 *.asv
 *.slxc
 *.autosave
+*.original
 .vscode/
 savedAgents/
 slprj/
