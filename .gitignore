@@ -2,10 +2,7 @@
 *.slxc
 *.autosave
 *.original
-<<<<<<< HEAD
 logs/
-=======
->>>>>>> 5097958338995e2034ea5d14f8b22d1edbb4f3ec
 .vscode/
 savedAgents/
 slprj/

@@ -5,7 +5,7 @@ clear slBus1;
 % diary on;
 %% configuration params
 % choose among {esp_bicycle,dcmotor,quadrotor,fuel_injection,driveline_mngmnt,esp,ttc}
-system = "esp"
+system = "trajectory"
 
 % agent activation: a= attacker, d= detector, c= controller
 whichAgents = "ad";
