@@ -1,27 +1,36 @@
-function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K, th, delta)
+function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K, th, delta,proc_var,meas_var)
 %     disp("resetting");
     % Randomization Parameters
     % Note: Y-direction parameters are only used for the 3D walker model
     rng shuffle;
-    seed= rng;
-    %% noise
-    proc_noise= 1*rand(xdim,simlen);
+    seed= rng
+     %% noise
+    proc_noise= proc_var*rand(xdim,simlen);
     in = in.setVariable('s.proc_noise', proc_noise);
-    meas_noise= 0.01*rand(ydim,simlen);
+    meas_noise= meas_var*rand(ydim,simlen);
     in = in.setVariable('s.meas_noise', meas_noise);
     %% init
     t= 0.00;
+    isatk =0;
+    atkon=randi([0,1]);
     in = in.setVariable('s.time', t);
     x =zeros(xdim,simlen);
 %         init_x = [];
+%     for k=1:xdim
+%        initrange(k) = init(1,k)-init(2,k);
+%        x(k,1) = (initrange(k)*rand-init(2,k))';
+%     end
     for k=1:xdim
-       x(k,1) = (2*init*safex(k)*rand-safex(k)*init)'
+       x(k,1) = (2*init*safex(k)*rand-safex(k)*init)';
+%         x(k,1) = -1*(safex(k)*init)';
     end   
+    
 %     init_x =(2*init*safex*rand*eye(xdim)-safex*init)'
 %      x = [2*s.safex'*randn(1,xdim)-s.safex' zeros(xdim,simlen-1)] 
 %     x(:,1) = init_x ;
     in = in.setVariable('s.x_act', x);
     xhat = zeros(xdim,simlen);
+    xhat(:,1) = x(:,1);
     in = in.setVariable('s.xhat', xhat);
     est_err= x -xhat;
     in = in.setVariable('s.est_err', est_err);

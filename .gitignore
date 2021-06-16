@@ -1,7 +1,9 @@
 *.asv
 *.slxc
 *.autosave
+*.original
+logs/
 .vscode/
 savedAgents/
 slprj/
-diary
+diary*
