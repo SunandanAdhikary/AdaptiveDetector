@@ -1,13 +1,12 @@
 % X_R = 0.2*X_S
-
 clear;
 clc;
 % clf;
 % {esp_bicycle,dcmotor,quadrotor,fuel_injection,driveline_mngmnt,esp,ttc}
-system = "quadrotor"
+system = "fuel_injection"
 
 %% driveline_mngmnt(Modeling and Control of an Engine Fuel Injection System)
-if system=="driveline_mngmnt" % linearized clitch+
+if system=="driveline_mngmnt" % linearized clutch+driveline
 Ts = 0.02;
 A = [0,0,1,-i_t,0;
     0,0,0,1/i_f;-1;
@@ -150,7 +149,7 @@ LL = 0.5;
 A = [0 1 0;
     0 -b/J KK/J;
     0 -KK/LL -RR/LL];
-B = [0; 0;1/LL];
+B = [0; 0; 1/LL];
 C = [1 0 0];
 D = [0];
 Q= eye(size(A,2));
@@ -162,6 +161,7 @@ sys_ss = ss(A-B*K,B,C,D,Ts);
 [kalmf,L,P,M] = kalman(sys_ss,QN,RN);
 safex = [4,100,100];
 % safer region of this system to start from
+
 ini = 1;
 % from perfReg.py with this system
 perf = [-1.67,-1.47];
@@ -236,7 +236,6 @@ RN = 10*eye(1);
 [kalmf,L,P,M] = kalman(sys_ss,QN,RN,Ts);
 % K = [-0.0987 0.1420];
 L = [-0.0390;0.4339];
-L 
 proc_var= 0.1; meas_var=0.001;
 end
 
@@ -252,7 +251,7 @@ if system=="ttc"
 ini=0.1;
 perf=0.3;
 safex=[25 30]
-proc_var= 1; meas_var=0.01;
+proc_var= 0.1; meas_var=0.01;
 end
 
 %% init 

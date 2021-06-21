@@ -25,6 +25,7 @@ if loadPreTrained
         %01-Apr-2021_20-28-26_esp_ad";
 %     31-Mar-2021_08-19-09_esp_ad";lastth0
 end
+
 %% log? then on, else comment out
 dt=strrep(datestr(datetime),':','-');dt=strrep(dt,' ','_');
 % mkdir('..','logs');
@@ -177,8 +178,8 @@ taulim= 1;
 %% random noise vars
 rng shuffle;
 seed= rng;
-s.proc_noise= 0.1*rand(xdim,simlen);
-s.meas_noise= 0.001*rand(ydim,simlen);
+s.proc_noise= s.proc_noise_var*rand(xdim,simlen);
+s.meas_noise= s.meas_noise_var*rand(ydim,simlen);
 %% init system vars
 isatk=0;
 s.time = 0.00;  

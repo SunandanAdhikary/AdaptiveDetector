@@ -11,7 +11,7 @@ function in = new_randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C
     in = in.setVariable('s.meas_noise', meas_noise);
     %% init
     t= 0.00;
-    atkon=randi([0,1]);
+    atkOn=randi([0,1]);
     isatk=0;
     in = in.setVariable('s.time', t);
     x =zeros(xdim,simlen);

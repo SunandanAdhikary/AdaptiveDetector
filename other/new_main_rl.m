@@ -11,7 +11,7 @@ system = "esp"
 % agent activation: a= attacker, d= detector, c= controller
 whichAgents = "ad";
 whichAg_sim=1; % same as whichAgents: numeric for simulink
-
+atkOn=randi([0,1]);
 model = "new_envModel_rl";
 
 % reset: in case models are not trained right, 
@@ -26,6 +26,7 @@ if loadPreTrained
         %01-Apr-2021_20-28-26_esp_ad";
 %     31-Mar-2021_08-19-09_esp_ad";lastth0
 end
+
 %% log? then on, else comment out
 dt=strrep(datestr(datetime),':','-');dt=strrep(dt,' ','_');
 % mkdir('..','logs');
@@ -44,7 +45,7 @@ if system== "esp"
     % K=[-0.0987 0.1420];
     s.K = [0.2826    0.0960];
     s.L= [-0.0390;0.4339];
-    s.safex = [1,2;-1,-2];
+    s.safex = [1,2;-1,-2]; % [lb_x1,ub_x1;lb_x2,ub_x2..]
     % % safer region of this system to start from
     s.init = 0.9*s.safex;
     % from perfReg.py with this system
@@ -154,7 +155,50 @@ if system=="trajectory"
     s.uatkon=[1];   % attack on which u
     s.yatkon=[1];   % attack on which y
 end
+%% dcmotor(2020_RTSS_Real-Time Attack-Recovery for Cyber-Physical Systems Using Linear Approximations)
+if system=="dcmotor"
+s.Ts = 0.1;
+J = 0.01;
+b = 0.1;
+KK = 0.01;
+RR = 1;
+LL = 0.5;
+s.A = [0 1 0;
+    0 -b/J KK/J;
+    0 -KK/LL -RR/LL];
+s.B = [0; 0; 1/LL];
+s.C = [1 0 0];
+s.D = [0];
+Q= eye(size(A,2));
+R= 0.01*eye(size(B,2));
+[s.K,S,E] = dlqr(A,B,Q,R);
+QN = 1500;
+RN = eye(1);
+sys_ss = ss(A-B*K,B,C,D,Ts);
+[kalmf,s.L,P,M] = kalman(sys_ss,QN,RN);
+s.safex = [4,100,100];
+% safer region of this system to start from
 
+s.init = 1;
+% from perfReg.py with this system
+s.perf = [-1.67,-1.47];
+% for central chi2 FAR < 0.05
+s.th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
+s.sensorRange = [4];  % columnwise range of each y
+s.actuatorRange = [36];   % columnwise range of each u
+s.proc_var= 0.1; meas_var=0.01;
+s.settlingTime = 13; 
+% from system_with_noise.m with this system
+s.noisy_zvar= 0.14;
+% from system_with_noise.m with this system
+s.noisy_zmean= 0.52;
+s.noisy_delta= 1.86;
+s.nonatk_zvar= 12.6041;%15.8507
+s.nonatk_zmean= 0.6064;
+s.nonatk_delta= 0.0292;
+s.uatkon=[1];   % attack on which u
+s.yatkon=[1];   % attack on which y
+end
 
 %% training/simulation length
 simlen=80;
@@ -467,7 +511,7 @@ env = rlSimulinkEnv(model,agents,observations,actions);
 % obsInfo=getObservationInfo(env); actInfo=getActorInfo(env); %% How to
 %% reset the environment in every episode
 % @(in)localResetFcn(in); env.ResetFcn = @(in);
-env.ResetFcn = @(in) randomReset(in, s.init, s.safex, simlen, xdim, ydim, ...
+env.ResetFcn = @(in) new_randomReset(in, s.init, s.safex, simlen, xdim, ydim, ...
                    ylim, ulim, s.C, s.K, s.th,s.non_cent(1),s.proc_noise_var,s.meas_noise_var);
 
 
