@@ -3,7 +3,7 @@ clear;
 clc;
 % clf;
 % {esp_bicycle,dcmotor,quadrotor,fuel_injection,driveline_mngmnt,esp,ttc}
-system = "fuel_injection"
+system = "aircraft"
 
 %% driveline_mngmnt(Modeling and Control of an Engine Fuel Injection System)
 if system=="driveline_mngmnt" % linearized clutch+driveline
@@ -108,6 +108,7 @@ C1 = [1;0;0;0];
 C2 = [1;0];
 C = blkdiag(C1',C1',C1',C2');
 D = zeros(size(C,1),size(B,2));
+
 Q= eye(size(A,2));
 R= 0.01*eye(size(B,2));
 [K,S,E] = dlqr(A,B,Q,R);
@@ -116,10 +117,10 @@ RN = eye(1);
 sys_ss = ss(A-B*K,B,C,D,Ts);
 [kalmf,L,P,M] = kalman(sys_ss,QN,RN);
 safex = [4,100,100];
-% safer region of this system to start from
-ini = 1;
 % from perfReg.py with this system
 perf = [-1.67,-1.47];
+% safer region of this system to start from
+ini = perf;
 % for central chi2 FAR < 0.05
 th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
 sensorRange = [4];  % columnwise range of each y
@@ -140,49 +141,92 @@ end
 
 %% dcmotor(2020_RTSS_Real-Time Attack-Recovery for Cyber-Physical Systems Using Linear Approximations)
 if system=="dcmotor"
-Ts = 0.1;
-J = 0.01;
-b = 0.1;
-KK = 0.01;
-RR = 1;
-LL = 0.5;
-A = [0 1 0;
-    0 -b/J KK/J;
-    0 -KK/LL -RR/LL];
-B = [0; 0; 1/LL];
-C = [1 0 0];
-D = [0];
-Q= eye(size(A,2));
-R= 0.01*eye(size(B,2));
-[K,S,E] = dlqr(A,B,Q,R);
-QN = 1500;
-RN = eye(1);
-sys_ss = ss(A-B*K,B,C,D,Ts);
-[kalmf,L,P,M] = kalman(sys_ss,QN,RN);
-safex = [4,100,100];
-% safer region of this system to start from
-
-ini = 1;
-% from perfReg.py with this system
-perf = [-1.67,-1.47];
-% for central chi2 FAR < 0.05
-th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
-sensorRange = [4];  % columnwise range of each y
-actuatorRange = [36];   % columnwise range of each u
-proc_var= 0.1; meas_var=0.01;
-settlingTime = 13; 
-% from system_with_noise.m with this system
-noisy_zvar= 0.14;
-% from system_with_noise.m with this system
-noisy_zmean= 0.52;
-noisy_delta= 1.86;
-nonatk_zvar= 12.6041;%15.8507
-nonatk_zmean= 0.6064;
-nonatk_delta= 0.0292;
-uatkon=[1];   % attack on which u
-yatkon=[1];   % attack on which y
+    % states: rotational ang., angular vel., armature current
+    % output rotational angle
+    % input armature voltage
+    Ts = 0.1;
+    J = 0.01;
+    b = 0.1;
+    KK = 0.01;
+    RR = 1;
+    LL = 0.5;
+    A = [0 1 0;
+        0 -b/J KK/J;
+        0 -KK/LL -RR/LL];
+    B = [0; 0; 1/LL];
+    C = [1 0 0];
+    D = [0];
+    Q= eye(size(A,2));
+    R= 0.01*eye(size(B,2));
+    [K,S,E] = dlqr(A,B,Q,R);
+    QN = 1500;
+    RN = eye(1);
+    sys_ss = ss(A-B*K,B,C,D,Ts);
+    [kalmf,L,P,M] = kalman(sys_ss,QN,RN);
+    safex = [-4,0,4,100,100];
+    % from perfReg.py with this system
+    perf = [-1.67,-1.67,-1.67;-1.47,-1.47,-1.47];
+    % safer region of this system to start from
+    ini = perf;
+    % for central chi2 FAR < 0.05
+    th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
+    sensorRange = [4];  % columnwise range of each y
+    actuatorRange = [36];   % columnwise range of each u
+    proc_var= 0.1; meas_var=0.01;
+    settlingTime = 13; 
+    % from system_with_noise.m with this system
+    noisy_zvar= 0.14;
+    % from system_with_noise.m with this system
+    noisy_zmean= 0.52;
+    noisy_delta= 1.86;
+    nonatk_zvar= 12.6041;%15.8507
+    nonatk_zmean= 0.6064;
+    nonatk_delta= 0.0292;
+    uatkon=[1];   % attack on which u
+    yatkon=[1];   % attack on which y
 end
-
+%% aircraft(ctms/Real-Time Attack-Recovery for Cyber-Physical Systems Using Linear Approximations)
+if system=="aircraft"
+    % states: attack angle, pitch rate, pitch angle
+    % output pitch angle
+    % input angle of deflection
+    A = [-0.313 56.7 0;-0.0139 -0.426 0;0 56.7 0];
+    B = [0.232;0.0203;0];
+    C = [0 0 1];
+    D = zeros(size(C,1),size(B,2));
+    Ts = 0.02;    
+    Q= 4.5*C'*C;
+    R= 0.2;
+    [K,S,E] = dlqr(A,B,Q,R);% from ctms
+    QN = 1500;
+    RN = 10*eye(1);
+    sys_ss = ss(A-B*K,B,C,D,Ts);
+    [kalmf,L,P,M] = kalman(sys_ss,QN,RN);
+    % safery constraints
+    safex = [0 0 0; 2 2 2];
+    % performance region of this system
+    perf = [0.68 0.68 0.68;0.72 0.72 0.72];
+    % safer region of this system to start from
+    ini = perf;
+    % for central chi2 FAR < 0.05
+    th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
+    sensorRange = [0;2];  % columnwise range of each y
+    % columnwise range of each u
+    actuatorRange = [-0.4363 ;0.4363 ];   % from ctms control tab
+    proc_var= 0.001;
+    meas_var=0.0001;
+    settlingTime = 13; 
+    % from system_with_noise.m with this system
+    noisy_zvar= 0.14;
+    % from system_with_noise.m with this system
+    noisy_zmean= 0.52;
+    noisy_delta= 1.86;
+    nonatk_zvar= 12.6041;%15.8507
+    nonatk_zmean= 0.6064;
+    nonatk_delta= 0.0292;
+    uatkon=[1];   % attack on which u
+    yatkon=[1];   % attack on which y 
+end
 %% esp_bicycle
 if system=="esp_bicycle"
 Ts=0.04;
@@ -260,7 +304,11 @@ xdim=size(A,1);
 udim=size(B,2);
 ydim=size(C,1);
 rng shuffle;
-x=(2*ini*safex*rand(xdim)-safex*ini)';
+% x=(2*ini*safex*rand(xdim)-safex*ini)';
+for k=1:xdim
+   x(k,1) = (2*ini(k)*rand-ini(k))';
+%         x(k,1) = -1*(safex(k)*init)';
+end  
 % proc_var= 1; meas_var=0.01;
 % x = [0.0976827903;0.1724794346];
 y = C*x;
@@ -277,9 +325,10 @@ res = zeros(ydim,time+1);
 est_err = zeros(xdim,time+1);
 
 for i=2:time+1
-   y = C*x + meas_var*rand(size(C,1),1);
+   i
+   y = C*x + meas_var*(2.*rand(size(C,1),1)-eye());
    r = y - C*z;
-   z = A*z + B*u + L*r;
+   z = A*z + B*u + L*r
    x = A*x + B*u + proc_var*rand(size(C,1),1)
    u = -K*z;
    
@@ -309,12 +358,20 @@ for j=1:xdim
     plot(state(j,:)');
     plot(state_est(j,:)');
     legend(strcat({'x','z'},{num2str(j),num2str(j)}));
-    axis([1 time -10*safex(j) 10*safex(j)]);
+    axis([1 time safex(1,j) safex(2,j)]);
     hold off;
 end
 
 max_x
-% max_x2
-res_cov = cov(res)
-res_mean = mean(res)
+max_u
+if exist('res_cov','var')
+    res_cov = max(res_cov,cov(res))
+else
+    res_cov = cov(res)
+end
+if exist('res_mean','var')
+    res_mean = min(res_mean,mean(res))
+else
+    res_mean = mean(res)
+end
 chi_sq = mean(res)*inv(cov(res))*mean(res)'

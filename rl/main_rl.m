@@ -12,16 +12,16 @@ whichAgents = "ad";
 whichAg_sim=1; % same as whichAgents: numeric for simulink
 
 model = "envModel_rl";
-
+open(model);
 % reset: in case models are not trained right, 
 % ..make fresh models removing the current object
 doReset = true;    % if you want to dreshly create model,agents
-doTraining = true;  % if you want to newly train the agents
+doTraining = false;  % if you want to newly train the agents
 doSimulation = true; % if you want to simulate after training
-loadPreTrained = false;  % if you want to reuse well trained agents
+loadPreTrained = true;  % if you want to reuse well trained agents
 if loadPreTrained
     % choose a backed up folder from savedAgents folder
-    PRE_TRAINED_MODEL_DIR = "savedAgents/lastWellTrained_"+system;
+    PRE_TRAINED_MODEL_DIR = "savedAgents/15-Jul-2021_23-17-25_"+system+"_"+whichAgents;
         %01-Apr-2021_20-28-26_esp_ad";
 %     31-Mar-2021_08-19-09_esp_ad";lastth0
 end
@@ -29,9 +29,9 @@ end
 %% log? then on, else comment out
 dt=strrep(datestr(datetime),':','-');dt=strrep(dt,' ','_');
 % mkdir('..','logs');
-logfile = '..\logs\'+system+'_'+whichAgents+'_'+dt+'.log';
-diary(logfile);
-diary on;
+% logfile = '..\logs\'+system+'_'+whichAgents+'_'+dt+'.log';
+% diary(logfile);
+% diary on;
 
 %% systems
 if system== "esp"
@@ -181,6 +181,7 @@ seed= rng;
 s.proc_noise= s.proc_noise_var*rand(xdim,simlen);
 s.meas_noise= s.meas_noise_var*rand(ydim,simlen);
 %% init system vars
+ atkOn=randi([0,1]);
 isatk=0;
 s.time = 0.00;  
 s.x_act =zeros(xdim,simlen);

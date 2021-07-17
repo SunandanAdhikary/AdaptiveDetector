@@ -12,7 +12,7 @@ function in = randomReset(in, init, safex, simlen, xdim, ydim, ylim, ulim, C, K,
     %% init
     t= 0.00;
     isatk =0;
-    atkon=randi([0,1]);
+    atkOn=randi([0,1]);
     in = in.setVariable('s.time', t);
     x =zeros(xdim,simlen);
 %         init_x = [];
