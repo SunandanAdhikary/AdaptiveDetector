@@ -1,38 +1,28 @@
 clc;
 clear slBus1;
-
 % log? then on
 % diary on;
 %% configuration params
-% choose among {esp_bicycle,dcmotor,quadrotor,fuel_injection,driveline_mngmnt,esp,ttc}
-% see system_with_noise.m
+
+% choose among {trajectory, esp, esp_journal}
 system = "esp"
 
 % agent activation: a= attacker, d= detector, c= controller
 whichAgents = "ad";
 whichAg_sim=1; % same as whichAgents: numeric for simulink
-atkOn=randi([0,1]);
+
 model = "new_envModel_rl";
 
 % reset: in case models are not trained right, 
-% ..make fresh models removing the current object
-doReset = true;    % if you want to dreshly create model,agents
+% ..make fresh models chucking the current object
+doReset = false;    % if you want to dreshly create model,agents
 doTraining = true;  % if you want to newly train the agents
 doSimulation = true; % if you want to simulate after training
 loadPreTrained = false;  % if you want to reuse well trained agents
 if loadPreTrained
     % choose a backed up folder from savedAgents folder
     PRE_TRAINED_MODEL_DIR = "savedAgents/lastWellTrained_"+system;
-        %01-Apr-2021_20-28-26_esp_ad";
-%     31-Mar-2021_08-19-09_esp_ad";lastth0
 end
-
-%% log? then on, else comment out
-dt=strrep(datestr(datetime),':','-');dt=strrep(dt,' ','_');
-% mkdir('..','logs');
-logfile = '..\logs\'+system+'_'+whichAgents+'_'+dt+'.log';
-diary(logfile);
-diary on;
 
 %% systems
 if system== "esp"
@@ -45,18 +35,16 @@ if system== "esp"
     % K=[-0.0987 0.1420];
     s.K = [0.2826    0.0960];
     s.L= [-0.0390;0.4339];
-    s.safex = [1,2;-1,-2]; % [lb_x1,ub_x1;lb_x2,ub_x2..]
-    % % safer region of this system to start from
-    s.init = 0.9*s.safex;
+    s.safex = [1,2];
     % from perfReg.py with this system
-    s.perf = 0.1*s.safex;
+    s.init = 1;
+    % from perfReg.py with this system
+    s.perf = 0.1;
     % for central chi2 FAR < 0.05
     s.th = 4.5; 
     s.settlingTime = 5 ;
     s.sensorRange = [2.5] ;     % columnwise range of each y
     s.actuatorRange = [0.8125]; % columnwise range of each u
-    s.proc_noise_var=0.001;
-    s.meas_noise_var= 0.0001;
     % from system_with_noise.m with this system
     s.noisy_zvar=0.27;
     % from system_with_noise.m with this system
@@ -90,11 +78,11 @@ if system=="esp_journal"
     s.L = [-0.00000000002708 -0.00000000063612;
         0.00000000033671  0.00000000556308];
     
-    s.safex = [1,2;-1,-2];
+    s.safex = [1,2];
     % from perfReg.py with this system
-    s.init = 1*s.safex;
+    s.init = 1;
     % from perfReg.py with this system
-    s.perf = 0.2*s.safex;
+    s.perf = 0.2;
     % for central chi2 FAR < 0.05
     s.th = 4.35; 
     s.settlingTime = 12 ;
@@ -105,10 +93,6 @@ if system=="esp_journal"
     % from system_with_noise.m with this system
     s.noisy_zmean= [3.6 -372.7];
     s.noisy_delta= 41;
-    % from system_with_noise.m with this system
-    s.nonatk_zvar=[10000 -21;-21 15727];   
-    s.nonatk_zmean= [3.6 -372.7];
-    s.nonatk_delta= 41;
     s.uatkon=[1;0];   % attack on which u
     s.yatkon=[1;1];   % attack on which y
 end
@@ -120,30 +104,18 @@ if system=="trajectory"
     s.B = [0.0050; 0.1000];
     s.C = [1 0];
     s.D = [0];
-%     s.K = [16.0302    5.6622];  % settling time around 15
-%     s.L = [0.9902; 0.9892];
-%   ---new values for better intermediate safety---
-%     Q= eye(size(s.A,2));
-%     R= eye(size(s.B,2));
-%     [K,S,E] = dlqr(s.A,s.B,Q,R);
-%     QN = 1500;
-%     RN = eye(1);
-%     sys_ss = ss(s.A,s.B,s.C,s.D,s.Ts);
-%     [kalmf,L,P,M] = kalman(sys_ss,QN,RN);
-    s.K = [0.9171    1.6356];  
-    s.L = [0.8327;   2.5029];
-    s.safex = [25,30;-25,-30];
-    % safer region of this system to start from
-    s.init = 0.6;
+    s.K = [16.0302    5.6622];  % settling time around 10
+    s.L = [0.9902; 0.9892];
+    s.safex = [25,30];
     % from perfReg.py with this system
-    s.perf = s.init;% 0.3;
+    s.init = 1;
+    % from perfReg.py with this system
+    s.perf = 0.3;
     % for central chi2 FAR < 0.05
     s.th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
     s.sensorRange = [30];  % columnwise range of each y
-    s.actuatorRange = [72]; %[36];   % columnwise range of each u
+    s.actuatorRange = [36];   % columnwise range of each u
     s.settlingTime = 13; 
-    s.proc_noise_var=0.01;
-    s.meas_noise_var= 0.001;
     % from system_with_noise.m with this system
     s.noisy_zvar= 0.14;
     % from system_with_noise.m with this system
@@ -155,54 +127,11 @@ if system=="trajectory"
     s.uatkon=[1];   % attack on which u
     s.yatkon=[1];   % attack on which y
 end
-%% dcmotor(2020_RTSS_Real-Time Attack-Recovery for Cyber-Physical Systems Using Linear Approximations)
-if system=="dcmotor"
-s.Ts = 0.1;
-J = 0.01;
-b = 0.1;
-KK = 0.01;
-RR = 1;
-LL = 0.5;
-s.A = [0 1 0;
-    0 -b/J KK/J;
-    0 -KK/LL -RR/LL];
-s.B = [0; 0; 1/LL];
-s.C = [1 0 0];
-s.D = [0];
-Q= eye(size(A,2));
-R= 0.01*eye(size(B,2));
-[s.K,S,E] = dlqr(A,B,Q,R);
-QN = 1500;
-RN = eye(1);
-sys_ss = ss(A-B*K,B,C,D,Ts);
-[kalmf,s.L,P,M] = kalman(sys_ss,QN,RN);
-s.safex = [4,100,100];
-% safer region of this system to start from
 
-s.init = 1;
-% from perfReg.py with this system
-s.perf = [-1.67,-1.47];
-% for central chi2 FAR < 0.05
-s.th = 4.35;              % new: changed it a bit so that without attack, the residue remains below threshold.
-s.sensorRange = [4];  % columnwise range of each y
-s.actuatorRange = [36];   % columnwise range of each u
-s.proc_var= 0.1; meas_var=0.01;
-s.settlingTime = 13; 
-% from system_with_noise.m with this system
-s.noisy_zvar= 0.14;
-% from system_with_noise.m with this system
-s.noisy_zmean= 0.52;
-s.noisy_delta= 1.86;
-s.nonatk_zvar= 12.6041;%15.8507
-s.nonatk_zmean= 0.6064;
-s.nonatk_delta= 0.0292;
-s.uatkon=[1];   % attack on which u
-s.yatkon=[1];   % attack on which y
-end
 
 %% training/simulation length
 simlen=80;
-maxepisodes  = 3000;
+maxepisodes  = 20000;
 % simlen=ceil(Tf/Ts);
 % maxepisodes  = 5;
 % agents= model+["/RL Attacker Agent","/RL Controller Agent"]%...
@@ -219,22 +148,15 @@ udim= size(s.B,2);
 %% ranges
 ulim= s.actuatorRange;
 ylim= s.sensorRange;
-thlim= 10;
-taulim= 1;
 %% random noise vars
 rng shuffle;
 seed= rng;
-s.proc_noise= s.proc_noise_var*rand(xdim,simlen);
-s.meas_noise= s.meas_noise_var*rand(ydim,simlen);
+s.proc_noise= 1*rand(xdim,simlen);
+s.meas_noise= 0.01*rand(ydim,simlen);
 %% init system vars
-isatk=0;
 s.time = 0.00;  
 s.x_act =zeros(xdim,simlen);
-% s.x_act(:,1) =(2*s.init*s.safex*rand(xdim)-s.safex*s.init)';
-initrange = s.init(1,:)-s.init(2,:);
-for k=1:xdim
-   s.x_act(k,1) = (initrange(k)*rand-s.init(2,k))';
-end
+s.x_act(:,1) =(2*s.init*s.safex*rand(xdim)-s.safex*s.init)';
 % s. xatk(1)= s.x_act(1);
 s.xhat = zeros(xdim,simlen);
 % s.est_err(:,simlen)= zeros(size(xdim,simlen));
@@ -260,11 +182,10 @@ s.avgtpr = ncx2cdf(s.th,1*size(s.C,1),s.non_cent(1),'upper')*ones(1,simlen);
 %% Agent Observation / Action Dimensions
 atkActDim= udim+ydim;%[au;ay]
 dtcActDim= 2; %[th;l]
-% dtcActDim= 1; %[th;l]
 conActDim= udim; % [u_new]
 atkObsDim= ydim+udim+1+atkActDim;%[y;u;g;prevAct]
 dtcObsDim= dtcActDim+1+1;%[prevAct;g;delta]
-conObsDim= udim+conActDim+xdim;%[ulim;prevAct;xhat]
+conObsDim= udim+conActDim+ydim+1+size(s.C*s.safex',1);%[ulim;prevAct;y;ref;safey]
 %% Multi Agent Observation Properties
 % 1-- attacker, 2-- Controller, 3-- Detector
 obsInfo = {[rlNumericSpec([atkObsDim 1])], [rlNumericSpec([conObsDim 1])],...
@@ -287,8 +208,7 @@ actInfo = {rlNumericSpec([atkActDim 1],...
            rlNumericSpec([conActDim 1],...
             'LowerLimit', -ulim,'UpperLimit',ulim),...
            rlNumericSpec([dtcActDim 1],...
-            'LowerLimit',[0;1],'UpperLimit',[thlim;taulim])};
-%         'LowerLimit',[0;1],'UpperLimit',[50;10])};
+            'LowerLimit',[0;1],'UpperLimit',[50;10])};
 actInfo{1,1}.Name = 'actuator n sensor attack';
 actInfo{1,2}.Name = 'control input';
 actInfo{1,3}.Name = 'threshold n window';
@@ -411,7 +331,7 @@ actorNetwork = [
     reluLayer('Name','actorRelu2')
     fullyConnectedLayer(numActionsDtc,'Name','actorFC3')
     tanhLayer('Name','actorTanhDtc')
-    scalingLayer('Name','actorScalingDtc','Scale',[thlim/2;ceil(taulim/2)],'Bias',[thlim/2;ceil(taulim/2)+1])];
+    scalingLayer('Name','actorScalingDtc','Scale',25,'Bias',26)];
 actorOptions = rlRepresentationOptions('LearnRate',1e-04,'GradientThreshold',1);
 actorDtc = rlDeterministicActorRepresentation(actorNetwork,obsInfo{1,3},...
     actInfo{1,3}, 'Observation',{'StateDtc'},'Action',{'actorScalingDtc'},...
@@ -433,8 +353,6 @@ agents= [];
 observations={};
 actions={};
 agentObjs=[];
-target=[];
-targetAvgRwd = 10000;
 agentAttacker= "/attacker/RL Attacker Agent";
 agentController= "/controller/RL Controller Agent";
 agentDetector= "/detector/RL Detector Agent";
@@ -481,7 +399,6 @@ if whichAgents.contains("a")
     actions{end+1}= actInfo{1,1};
     agentObjs= [agentObjs agentAtk];
     whichAg_sim= whichAg_sim*2;
-    target= [target targetAvgRwd];
 end
 % c for controller agent = 3
 if whichAgents.contains("c")
@@ -490,7 +407,6 @@ if whichAgents.contains("c")
     actions{end+1}= actInfo{1,2};
     agentObjs= [agentObjs agentCon];
     whichAg_sim= whichAg_sim*3;
-    target= [target targetAvgRwd];
 end
 % d for detector agent = 5
 if whichAgents.contains("d")
@@ -499,7 +415,6 @@ if whichAgents.contains("d")
     actions{end+1}= actInfo{1,3};
     agentObjs= [agentObjs agentDtc];
     whichAg_sim= whichAg_sim*5;
-    target= [target targetAvgRwd];
 end
 % save("system.mat",'s');
 % save("test.mat",'Simulink.Bus.createObject(s)');
@@ -512,21 +427,20 @@ env = rlSimulinkEnv(model,agents,observations,actions);
 %% reset the environment in every episode
 % @(in)localResetFcn(in); env.ResetFcn = @(in);
 env.ResetFcn = @(in) new_randomReset(in, s.init, s.safex, simlen, xdim, ydim, ...
-                   ylim, ulim, s.C, s.K, s.th,s.non_cent(1),s.proc_noise_var,s.meas_noise_var);
-
+                                   ylim, ulim, s.C, s.K, s.th,s.non_cent(1));
 
 %% Training
 maxsteps = simlen;
 trainOpts = rlTrainingOptions(...
     'MaxEpisodes',maxepisodes, ...
     'MaxStepsPerEpisode',maxsteps, ...
-    'ScoreAveragingWindowLength',10, ...
+    'ScoreAveragingWindowLength',20, ...
     'Verbose',false, ...
     'Plots','training-progress',...
     'StopTrainingCriteria','AverageReward',...
-    'StopTrainingValue',target,...
+    'StopTrainingValue',[3500,3500],...
     'SaveAgentCriteria','EpisodeReward',...
-    'SaveAgentValue',target)%,...
+    'SaveAgentValue',[3500,3500])%,...
 %     'SaveExperienceBufferWithAgent',false);
 
 
@@ -534,7 +448,7 @@ if doTraining
     agentOpts.ResetExperienceBufferBeforeTraining = false;
     
     % make directory with model, specs in name
-%     dt=strrep(datestr(datetime),':','-');dt=strrep(dt,' ','_');
+    dt=strrep(datestr(datetime),':','-');dt=strrep(dt,' ','_');
     dtf=dt+"_"+system+"_"+whichAgents;
     mkdir(trainOpts.SaveAgentDirectory,dtf);
     savedir= trainOpts.SaveAgentDirectory+'/'+dtf;

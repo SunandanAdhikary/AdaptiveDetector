@@ -89,7 +89,7 @@ for i=1:t
     constraints = [constraints, (-1)*sensor_limit <= C*xhati <= sensor_limit];
     constraints = [constraints, ...
         (-1)*sqrt(threshold*nonatk_cov) <= C*xi + ay(1) - C*xhati <= sqrt(threshold*nonatk_cov)];
-    constraints = [constraints, (-1)*actuator_limit <= ui + + au(1) <= actuator_limit];
+    constraints = [constraints, (-1)*actuator_limit <= ui + au(1) <= actuator_limit];
     constraints = [constraints, lower_safety <= xi <= upper_safety];
     constraints = [constraints, lower_safety <= xhati <= upper_safety];
 
