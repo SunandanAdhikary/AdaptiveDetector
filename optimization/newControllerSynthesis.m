@@ -241,8 +241,8 @@ K_new = {};
 x(:,1) = [x0;xhat0];
 % xhat(:,1) = xhat0;
 % u(:,1) = -K_new{1}*x(:,1);
-% y(:,1) = Caug1*x(:,1);
-% r(:,1) = y(:,1)-Caug2*x(:,1);
+y(:,1) = Caug1*x(:,1);
+r(:,1) = y(:,1)-Caug2*x(:,1);
 % figure("Name","states from "+factor+" times inside the safety boundary\n")
 % hold on;
 i = 1 ;
@@ -250,13 +250,13 @@ constraints = [constraints, norm(r(:,1),inf) <= threshold-0.0001];
 inside = (value(x(:,i)) >= [perf(1,:)';perf(1,:)'])' * (value(x(:,i)) <= [perf(2,:)';perf(2,:)']);
 while ~inside
     K_new{i} = sdpvar(size(Kaug,1),size(Kaug,2));
-    y(:,i) = Caug1*x(:,i+1);
-    r(:,i) = y(:,i+1) - Caug2*(Aaug*x(:,i) + Baug*u(:,i));
     u(:,i) = -K_new{i}*x(:,i);
     x(:,i+1) = Aaug*x(:,i) + Baug*u(:,i);
+    y(:,i+1) = Caug1*x(:,i+1);
+    r(:,i+1) = y(:,i+1) - Caug2*(Aaug*x(:,i) + Baug*u(:,i));
     constraints = [constraints,...
-                        norm(r(:,i),inf) <= threshold-0.0001,...
-                        (-1)*sensor_limit <= y(:,i), y(:,i) <= sensor_limit,...
+                        norm(r(:,i+1),inf) <= threshold-0.0001,...
+                        (-1)*sensor_limit <= y(:,i+1), y(:,i+1) <= sensor_limit,...
                         (-1)*actuator_limit <= u(:,i), u(:,i) <= actuator_limit,...
                         [safex(1,:)';safex(1,:)']<=x(:,i+1),x(:,i+1)<=[safex(2,:)';safex(2,:)']];
     sol = optimize(constraints,norm(Aaug-Baug*K_new{i},inf)-1,ops);

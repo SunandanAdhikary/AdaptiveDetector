@@ -217,7 +217,7 @@ Caug2 = [zeros(1,size(A,1)) C];
 Daug = zeros(size(Caug1,1),size(Baug,2));
 Kaug = [zeros(size(K)) K];
 q= 0.001;
-r =0.0001;
+r =0;%.0001;
 Q= q*eye(size(Aaug,2));
 R= r*eye(size(Baug,2));
 %% init
@@ -241,31 +241,38 @@ x = sdpvar(size(AA,2),n+1);
 e = sdpvar(size(AA,2),n+1);
 y = sdpvar(size(Caug1,1),n+1);
 r = sdpvar(size(CC,1),n+1);
-% K_new = {};
+K_new = {};
 Pmat = {};
 lyap_decay = [];
+cost = 0;
 x(:,1) = [x0;xhat0];
 % xhat(:,1) = xhat0;
 % u(:,1) = -K_new{1}*x(:,1);
-% y(:,1) = Caug1*x(:,1);
-% r(:,1) = y(:,1)-Caug2*x(:,1);
+y(:,1) = Caug1*x(:,1);
+r(:,1) = y(:,1)-Caug2*x(:,1);
 figure("Name","states from "+factor+" times inside the safety boundary\n")
 hold on;
 i = 1 ;
 constraints = [constraints, norm(r(:,1),inf) <= threshold-0.0001];
 inside = (value(x(:,i)) >= [perf(1,:)';perf(1,:)'])' * (value(x(:,i)) <= [perf(2,:)';perf(2,:)']);
 while ~inside
-    Pmat{i} = sdpvar(size(Aaug,1),size(Aaug,2));
-%     K_new{i} = sdpvar(size(Kaug,1),size(Kaug,2));
+%     Pmat{i} = sdpvar(size(Aaug,1),size(Aaug,2));
+    K_new{i} = sdpvar(size(Kaug,1),size(Kaug,2));
 %     K_new = inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug;
-    y(:,i) = Caug1*x(:,i+1);
-    r(:,i) = y(:,i+1) - Caug2*(Aaug*x(:,i) + Baug*u(:,i));
-%     u(:,i) = -K_new{i}*x(:,i);
+    u(:,i) = -K_new{i}*x(:,i);
 %     u(:,i) = -inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i);
-%     x(:,i+1) = Aaug*x(:,i) + Baug*u(:,i);
+    y(:,i+1) = Caug1*x(:,i+1);
+    r(:,i+1) = y(:,i+1) - Caug2*(Aaug*x(:,i) + Baug*u(:,i));
+    x(:,i+1) = Aaug*x(:,i) + Baug*u(:,i);
 %     x(:,i+1) = Aaug*x(:,i) - Baug*inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i);
-%     constraints = [constraints,... 
-% %                         (Aaug-Baug*K_new{i})'*Pmat*(Aaug-Baug*K_new{i})-(1+lyap_decay(i))*eye(size(A,1)*2)*Pmat<=0, Pmat>=slack,...
+    constraints = [constraints,... 
+                        norm(r(:,i+1),inf) <= threshold-0.0001,...
+                        (-1)*sensor_limit <= y(:,i+1), y(:,i+1) <= sensor_limit,...
+                        (-1)*actuator_limit <= u(:,i+1), u(:,i+1) <= actuator_limit,...
+                        [safex(1,:)';safex(1,:)']<=x(:,i+1),x(:,i+1)<=[safex(2,:)';safex(2,:)']];
+    cost = cost+ cost_func(u(:,i),x(:,i+1),perf,Q,R)
+    sol = optimize(constraints,cost,ops);
+%       constraints = [constraints,... 
 %                         (Aaug-Baug*inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)'*Pmat*(Aaug-Baug*inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)-(1+lyap_decay(i))*eye(size(A,1)*2)*Pmat{i}<=0, Pmat{i}>=slack,...
 %                         norm(r(:,i),inf) <= threshold-0.0001,...
 %                         (-1)*sensor_limit <= y(:,i), y(:,i) <= sensor_limit,...
@@ -275,23 +282,13 @@ while ~inside
 % %                         [safex(1,:)';safex(1,:)']<=x(:,i+1),x(:,i+1)<=[safex(2,:)';safex(2,:)'],...
 %                         [safex(1,:)';safex(1,:)']<=Aaug*x(:,i) - Baug*inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i)...
 %                         Aaug*x(:,i) - Baug*inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i)<=[safex(2,:)';safex(2,:)']];
-%     sol = optimize(constraints,trace(eig(Aaug-Baug*K_new{i}))),ops);
-      constraints = [constraints,... 
-                        (Aaug-Baug*inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)'*Pmat*(Aaug-Baug*inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)-(1+lyap_decay(i))*eye(size(A,1)*2)*Pmat{i}<=0, Pmat{i}>=slack,...
-                        norm(r(:,i),inf) <= threshold-0.0001,...
-                        (-1)*sensor_limit <= y(:,i), y(:,i) <= sensor_limit,...
-%                         (-1)*actuator_limit <= u(:,i), u(:,i) <= actuator_limit,...
-                        (-1)*actuator_limit <= -inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i),...
-                        -inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i) <= actuator_limit,...
-%                         [safex(1,:)';safex(1,:)']<=x(:,i+1),x(:,i+1)<=[safex(2,:)';safex(2,:)'],...
-                        [safex(1,:)';safex(1,:)']<=Aaug*x(:,i) - Baug*inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i)...
-                        Aaug*x(:,i) - Baug*inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i)<=[safex(2,:)';safex(2,:)']];
 
-    sol = optimize(constraints,lyap_delay(i),ops);
+%     sol = optimize(constraints,lyap_delay(i),ops);
     solved = sol.problem;
     if solved == 0
-        value(-inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)
-        stairs(x(:,i)');
+%         value(-inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)
+        value(-inv(R+Baug'*Q*Baug)*Baug'*Q*Aaug)
+        plot(x(:,i)');
     else
         fprintf("not found\n");
         break;
@@ -299,5 +296,18 @@ while ~inside
     i = i+1;
 end
 hold off;
-factor = factor -0.1
+if factor >= 0.4
+    factor = factor -0.1
+else 
+    fprintf("no controller found for "+num2str(factor)+" after "+num2str(i)+" iterations ");
+    break;
+end
+end
+%% cost function : kinda CBF-CLF
+function cost = cost_func(ui,xi,perf,Q,R)
+    cost = 1;
+    for i=1:size(perf,2)
+%         cost=cost*(-log(xi(i)-perf(1,i))-log(xi(i)-perf(2,i))); 
+    end
+    cost = xi'*Q*xi+ui'*R*ui;
 end
