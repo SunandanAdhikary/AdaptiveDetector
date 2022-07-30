@@ -24,7 +24,6 @@ if system=="esp"
     rate = 0.5;
 end
 if system=="trajectory"
-    Ts =0.1;
     A = [1.0000    0.1000; 0    1.0000];
     B = [0.0050; 0.1000];
     C = [1 0];
@@ -168,10 +167,10 @@ while x(1) < perf(1,1) || x(2) < perf(1,2)
 end
 xi
 xhati
-% figure
-% plot(xi')
-% figure
-% plot(xhati')
+figure
+plot(xi')
+figure
+plot(xhati')
 lqr_iter = k
 est_iter = j
 %% starting from positive safety border and ending at positive performance border
@@ -196,82 +195,87 @@ while x(1) < perf(2,1) || x(2) < perf(2,2)
     xi =[xi,x];
     xhati =[xhati,xhat];
 end
-xi
-xhati
-% figure;
-% plot(xi');
-% plot(xhati');
+
+plot(xi');
+plot(xhati');
 
 if lqr_iter < k
     lqr_iter = k
 end
 if est_iter < j
-    est_iter =j
+    est_iter = j
 end
 %% gain synthesis
-% augmented sytem modeling
-Aaug = [A, zeros(size(A));L*C*A, A-L*C*A];
-Baug = [B; B];
-Caug1 = [C zeros(1,size(A,1))];
-Caug2 = [zeros(1,size(A,1)) C];
-Daug = zeros(size(Caug1,1),size(Baug,2));
-Kaug = [zeros(size(K)) K];
 %% init
 solved = 1;
+solved1 = 1;
 factor = 1;
-slack = 0.01;
-augsys_d = ss(Aaug-Baug*Kaug,Baug,Caug1,Daug,Ts);
-augsys = d2c(augsys_d);
-[AA,BB,CC,DD] = ssdata(augsys);
-% KK = sdpvar(size(Kaug))
-while solved ~= 0
-% x0 = sdpvar(size(A,2),1);
-% assign(x0,safex(1,:).');
+slack = 0.0001;
+% init
 x0 = factor*safex(1,:).';
 xhat0 = sdpvar(size(A,2),1);
-constraints = [perf(1,:).' <= xhat0, xhat0 <=  perf(2,:).'];  
+constraints = [safex(1,:).' <= xhat0, xhat0 <=  safex(2,:).'];  
 n = lqr_iter;
-u = sdpvar(size(BB,2),n);
-x = sdpvar(size(AA,2),n+1);
-%     xhat = sdpvar(size(A,2),n+1);
-e = sdpvar(size(AA,2),n+1);
-y = sdpvar(size(Caug1,1),n+1);
-r = sdpvar(size(CC,1),n+1);
+u = sdpvar(size(B,2),n);
+x = sdpvar(size(A,2),n+1);
+xhat = sdpvar(size(A,2),n+1);
+e = sdpvar(size(A,2),n+1);
+y = sdpvar(size(C,1),n+1);
+r = sdpvar(size(C,1),n+1);
 K_new = {};
-x(:,1) = [x0;xhat0];
-% xhat(:,1) = xhat0;
-% u(:,1) = -K_new{1}*x(:,1);
-y(:,1) = Caug1*x(:,1);
-r(:,1) = y(:,1)-Caug2*x(:,1);
-% figure("Name","states from "+factor+" times inside the safety boundary\n")
-% hold on;
-i = 1 ;
-constraints = [constraints, norm(r(:,1),inf) <= threshold-0.0001];
-inside = (value(x(:,i)) >= [perf(1,:)';perf(1,:)'])' * (value(x(:,i)) <= [perf(2,:)';perf(2,:)']);
-while ~inside
-    K_new{i} = sdpvar(size(Kaug,1),size(Kaug,2));
-    u(:,i) = -K_new{i}*x(:,i);
-    x(:,i+1) = Aaug*x(:,i) + Baug*u(:,i);
-    y(:,i+1) = Caug1*x(:,i+1);
-    r(:,i+1) = y(:,i+1) - Caug2*(Aaug*x(:,i) + Baug*u(:,i));
-    constraints = [constraints,...
-                        norm(r(:,i+1),inf) <= threshold-0.0001,...
-                        (-1)*sensor_limit <= y(:,i+1), y(:,i+1) <= sensor_limit,...
-                        (-1)*actuator_limit <= u(:,i), u(:,i) <= actuator_limit,...
-                        [safex(1,:)';safex(1,:)']<=x(:,i+1),x(:,i+1)<=[safex(2,:)';safex(2,:)']];
-%     sol = optimize(constraints,norm(Aaug-Baug*K_new{i},inf)-1,ops);
-    sol = optimize(constraints,norm(Aaug-Baug*K_new{i},inf)-1,ops);
-    solved = sol.problem;
-    if solved == 0
-        value(K_new{i})
-%         stairs(x(:,i)');
-    else
-        fprintf("not found\n");
-        break;
+while solved1
+    K_new{1} = sdpvar(size(B,2),size(A,2));
+    x(:,1) = x0;
+    xhat(:,1) = xhat0;
+    u(:,1) = -K_new{1}*xhat0;
+    y(:,1) = C*x(:,1);
+    r(:,1) = y(:,1)-C*xhat(:,1);
+    e(:,1) = x(:,1)-xhat(:,1);
+    constraints = [constraints, norm(r(:,1),inf) <= threshold-slack,...
+                    (-1)*sensor_limit <= y(:,2), y(:,2) <= sensor_limit,...
+                    (-1)*actuator_limit <= u(:,1), u(:,1) <= actuator_limit,...
+                    safex(1,:)'<=x(:,2),x(:,2)<=safex(2,:)'];
+    sol = optimize(constraints,[],ops);
+    solved1 = sol.problem;
+    if solved1
+        factor = factor -0.1;
+        fprintf("reducing factor to "+num2str(factor));
+        x0 = factor*safex(1,:).';
+        xhat0 = sdpvar(size(A,2),1);
+        constraints = [safex(1,:).' <= xhat0, xhat0 <=  safex(2,:).'];  
+        continue;
     end
-    i = i+1;
-    inside = (value(x(:,i)) >= [perf(1,:)';perf(1,:)'])' * (value(x(:,i)) <= [perf(2,:)';perf(2,:)']);
 end
-% hold off;
-factor = factor -0.1
+%% sim
+i = 2;
+inside = min((value(x(:,i)) >= [perf(1,:)']).*(value(x(:,i)) <= [perf(2,:)']));
+while ~inside
+        K_new{i} = sdpvar(size(B,2),size(A,2));
+        u(:,i) = -K_new{i}*xhat(:,i);
+        x(:,i+1) = A*x(:,i) + B*u(:,i);
+        y(:,i+1) = C*x(:,i+1);
+        r(:,i+1) = y(:,i+1) - C*(A*xhat(:,i) + B*u(:,i));
+        xhat(:,i+1) = A*xhat(:,i) + B*u(:,i) + L*r(:,i+1);
+        e(:,i+1) = x(:,i+1) - xhat(:,i+1);
+        constraints = [norm(r(:,i+1),inf) <= threshold-slack,...
+                            (-1)*sensor_limit <= y(:,i+1), y(:,i+1) <= sensor_limit, ...
+                            (-1)*actuator_limit <= u(:,i), u(:,i) <= actuator_limit,...
+                            safex(1,:)'<=x(:,i+1),x(:,i+1)<=safex(2,:)'];
+
+%     for j = 1: size(A,1)
+    %     constraints = [constraints,safex(:,1).' >= max(xa(:,i+1))]; 
+        sol = optimize(constraints,[],ops);
+        solved = sol.problem
+        if solved == 0
+            Knew = value(K_new{i})
+            i = i+1
+            inside = min((value(x(:,i+1)) >= [perf(1,:)']).*(value(x(:,i+1)) <= [perf(2,:)']));
+        else 
+            fprintf("can not find a suitable controller from " +num2str(x(:,i))+" to "+num2str(x(:,i+1))+"\n");
+            break;
+        end
+%     end
+    n = n+1;
 end
+% factor = factor -0.1;
+% end

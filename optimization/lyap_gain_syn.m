@@ -125,12 +125,12 @@ while isCovered == false & sour(1)- goal(1)>1
     end
     desired_delay = (norm(goal,inf)/norm(sour,inf))^(1/k)
     lyap_decay = (desired_delay*desired_delay) - 1
-    cons=[Ac'*P*Ac-(1+lyap_decay)*eye(size(A,1)*2)*P<=0, P>=slack];
+%     cons=[Ac'*P*Ac-(1+lyap_decay)*eye(size(A,1)*2)*P<=0, P>=slack];
 %     consx=[(A+B*inv(R)*B'*Px)'*Px*(A+B*inv(R)*B'*Px)-(1+lyap_decay)*eye(size(A,1))*Px<=0, Px>=0];
-%     consx=[(A-B*inv(R+B'*Px*B)*B'*P*A)'*Px*(A-B*inv(R+B'*Px*B)*B'*Px*A)-(1+lyap_decay)*eye(size(A,1))*Px<=0, Px>=0];
-    sol = optimize(cons);
-%     solx = optimize(consx);
-    if sol.problem == 0
+    consx=[(A-B*inv(R+B'*Px*B)*B'*P*A)'*Px*(A-B*inv(R+B'*Px*B)*B'*Px*A)-(1+lyap_decay)*eye(size(A,1))*Px<=0, Px>=slack];
+%     sol = optimize(cons);
+    solx = optimize(consx);
+    if solx.problem == 0
         isCovered = true;
     else
         k = k+1;
@@ -145,7 +145,7 @@ end
 % initial(sys, x0);
 
 Pmat = value(P)
-Rc = blkdiag(R,R)
+Rc = 0.*blkdiag(R,R)
 Bc = blkdiag(B,B)
 Cc = blkdiag(C,C);
 Dc = blkdiag(D,D);

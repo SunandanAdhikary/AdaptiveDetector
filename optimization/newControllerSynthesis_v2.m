@@ -223,7 +223,7 @@ R= r*eye(size(Baug,2));
 %% init
 solved = 1;
 factor = 1;
-slack = 0.01;
+slack = 0.0001;
 augsys_d = ss(Aaug-Baug*Kaug,Baug,Caug1,Daug,Ts);
 augsys = d2c(augsys_d);
 [AA,BB,CC,DD] = ssdata(augsys);
@@ -233,7 +233,7 @@ while solved ~= 0
 % assign(x0,safex(1,:).');
 x0 = factor*safex(1,:).';
 xhat0 = sdpvar(size(A,2),1);
-constraints = [perf(1,:).' <= xhat0, xhat0 <=  perf(2,:).'];  
+constraints = [safex(1,:).' <= xhat0, xhat0 <=  safex(2,:).'];  
 n = lqr_iter;
 u = sdpvar(size(BB,2),n);
 x = sdpvar(size(AA,2),n+1);
@@ -250,11 +250,11 @@ x(:,1) = [x0;xhat0];
 % u(:,1) = -K_new{1}*x(:,1);
 y(:,1) = Caug1*x(:,1);
 r(:,1) = y(:,1)-Caug2*x(:,1);
-figure("Name","states from "+factor+" times inside the safety boundary\n")
+figure("Name","states from "+factor+" times inside the safety boundary")
 hold on;
 i = 1 ;
-constraints = [constraints, norm(r(:,1),inf) <= threshold-0.0001];
-inside = (value(x(:,i)) >= [perf(1,:)';perf(1,:)'])' * (value(x(:,i)) <= [perf(2,:)';perf(2,:)']);
+constraints = [constraints, norm(r(:,1),inf) <= threshold-slack];
+inside = min((value(x(:,i)) >= [perf(1,:)';perf(1,:)']).*(value(x(:,i)) <= [perf(2,:)';perf(2,:)']));
 while ~inside
 %     Pmat{i} = sdpvar(size(Aaug,1),size(Aaug,2));
     K_new{i} = sdpvar(size(Kaug,1),size(Kaug,2));
@@ -265,12 +265,15 @@ while ~inside
     r(:,i+1) = y(:,i+1) - Caug2*(Aaug*x(:,i) + Baug*u(:,i));
     x(:,i+1) = Aaug*x(:,i) + Baug*u(:,i);
 %     x(:,i+1) = Aaug*x(:,i) - Baug*inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i);
+    if i > 1
+        constraints =[];
+    end
     constraints = [constraints,... 
-                        norm(r(:,i+1),inf) <= threshold-0.0001,...
+                        norm(r(:,i+1),inf) <= threshold-slack,...
                         (-1)*sensor_limit <= y(:,i+1), y(:,i+1) <= sensor_limit,...
                         (-1)*actuator_limit <= u(:,i+1), u(:,i+1) <= actuator_limit,...
                         [safex(1,:)';safex(1,:)']<=x(:,i+1),x(:,i+1)<=[safex(2,:)';safex(2,:)']];
-    cost = cost+ cost_func(u(:,i),x(:,i+1),perf,Q,R)
+    cost = cost_func(u(:,i),x(:,i+1),perf,Q,R)
     sol = optimize(constraints,cost,ops);
 %       constraints = [constraints,... 
 %                         (Aaug-Baug*inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)'*Pmat*(Aaug-Baug*inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)-(1+lyap_decay(i))*eye(size(A,1)*2)*Pmat{i}<=0, Pmat{i}>=slack,...
@@ -282,24 +285,30 @@ while ~inside
 % %                         [safex(1,:)';safex(1,:)']<=x(:,i+1),x(:,i+1)<=[safex(2,:)';safex(2,:)'],...
 %                         [safex(1,:)';safex(1,:)']<=Aaug*x(:,i) - Baug*inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i)...
 %                         Aaug*x(:,i) - Baug*inv(R+Baug'*value(Pmat{i})*Baug)*Baug'*value(Pmat{i})*Aaug*x(:,i)<=[safex(2,:)';safex(2,:)']];
-
 %     sol = optimize(constraints,lyap_delay(i),ops);
     solved = sol.problem;
     if solved == 0
 %         value(-inv(R+Baug'*Pmat{i}*Baug)*Baug'*Pmat{i}*Aaug)
-        value(-inv(R+Baug'*Q*Baug)*Baug'*Q*Aaug)
+%         value(-inv(R+Baug'*Q*Baug)*Baug'*Q*Aaug);
+        value(K{i})
         plot(x(:,i)');
     else
-        fprintf("not found\n");
+        if i==1
+            factor = factor-0.1;
+            fprintf("no controller found from "+num2str(factor)+"* safex \n");
+%         else
+%             fprintf("no controller found for "+num2str(factor)+" after "+num2str(i)+" iterations \n");
+        end
         break;
     end
     i = i+1;
+    inside = min((value(x(:,i)) >= [perf(1,:)';perf(1,:)']).*(value(x(:,i)) <= [perf(2,:)';perf(2,:)']));
 end
 hold off;
-if factor >= 0.4
-    factor = factor -0.1
-else 
-    fprintf("no controller found for "+num2str(factor)+" after "+num2str(i)+" iterations ");
+if factor <= 0.5
+    break;
+else
+    fprintf("========================= no controller found for "+num2str(factor)+" after "+num2str(i)+" iterations ==================\n")
     break;
 end
 end
@@ -307,7 +316,7 @@ end
 function cost = cost_func(ui,xi,perf,Q,R)
     cost = 1;
     for i=1:size(perf,2)
-%         cost=cost*(-log(xi(i)-perf(1,i))-log(xi(i)-perf(2,i))); 
+        cost=cost*(-log(xi(i)-perf(1,i))-log(xi(i)-perf(2,i))); 
     end
-    cost = xi'*Q*xi+ui'*R*ui;
+%     cost = xi'*Q*xi+ui'*R*ui;
 end
