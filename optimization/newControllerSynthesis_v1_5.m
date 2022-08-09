@@ -2,7 +2,7 @@ clc;
 clear all;
 yalmip("clear");
 system = "trajectory"
-ops = sdpsettings('verbose',1);
+ops = sdpsettings('verbose',1,'CACHESOLVERS',1);
 %% systems
 if system=="esp"
     A = [0.4450 -0.0458;1.2939 0.4402];
@@ -223,6 +223,7 @@ e = sdpvar(size(A,2),n+1);
 y = sdpvar(size(C,1),n+1);
 r = sdpvar(size(C,1),n+1);
 K_new = {};
+i = 1;
 while solved1
     K_new{1} = sdpvar(size(B,2),size(A,2));
     x(:,1) = x0;
@@ -235,6 +236,16 @@ while solved1
                     (-1)*sensor_limit <= y(:,2), y(:,2) <= sensor_limit,...
                     (-1)*actuator_limit <= u(:,1), u(:,1) <= actuator_limit,...
                     safex(1,:)'<=x(:,2),x(:,2)<=safex(2,:)'];
+    x(:,i+1) = A*x(:,i) + B*u(:,i);
+    y(:,i+1) = C*x(:,i+1);
+    r(:,i+1) = y(:,i+1) - C*(A*xhat(:,i) + B*u(:,i));
+    xhat(:,i+1) = A*xhat(:,i) + B*u(:,i) + L*r(:,i+1);
+    e(:,i+1) = x(:,i+1) - xhat(:,i+1);
+   constraints = [constraints, norm(r(:,i+1),inf) <= threshold-slack,...
+                            (-1)*sensor_limit <= y(:,i+1), y(:,i+1) <= sensor_limit, ...
+                            (-1)*actuator_limit <= u(:,i), u(:,i) <= actuator_limit,...
+                            safex(1,:)'<=x(:,i+1),x(:,i+1)<=safex(2,:)'];
+
     sol = optimize(constraints,[],ops);
     solved1 = sol.problem;
     if solved1
@@ -244,10 +255,12 @@ while solved1
         xhat0 = sdpvar(size(A,2),1);
         constraints = [safex(1,:).' <= xhat0, xhat0 <=  safex(2,:).'];  
         continue;
+    else
+        i=i+1;
     end
 end
 %% sim
-i = 2;
+
 inside = min((value(x(:,i)) >= [perf(1,:)']).*(value(x(:,i)) <= [perf(2,:)']));
 while ~inside
         K_new{i} = sdpvar(size(B,2),size(A,2));
